@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -17,38 +18,25 @@ class User extends Authenticatable
 
     public const ROLE_CASHIER = 'cashier';
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var array<int, string>
-     */
     protected $fillable = [
         'name',
         'email',
         'password',
         'role',
+        'is_active',
     ];
 
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var array<int, string>
-     */
     protected $hidden = [
         'password',
         'remember_token',
     ];
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
     protected function casts(): array
     {
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_active' => 'boolean',
         ];
     }
 
@@ -72,5 +60,49 @@ class User extends Authenticatable
         $roles = (array) $roles;
 
         return in_array($this->role, $roles, true);
+    }
+
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->where('is_active', true);
+    }
+
+    /**
+     * Get granular permissions list for role-aware UI.
+     *
+     * @return array<string>
+     */
+    public function getPermissions(): array
+    {
+        return match ($this->role) {
+            self::ROLE_ADMIN => [
+                'users.manage',
+                'settings.manage',
+                'categories.view',
+                'categories.manage',
+                'units.view',
+                'units.manage',
+                'products.view',
+                'products.manage',
+                'products.import',
+                'products.cost_view',
+            ],
+            self::ROLE_MANAGER => [
+                'categories.view',
+                'categories.manage',
+                'units.view',
+                'units.manage',
+                'products.view',
+                'products.manage',
+                'products.import',
+                'products.cost_view',
+            ],
+            self::ROLE_CASHIER => [
+                'categories.view',
+                'units.view',
+                'products.view',
+            ],
+            default => [],
+        };
     }
 }

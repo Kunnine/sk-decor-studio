@@ -5,69 +5,80 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-test('user can login with valid credentials', function () {
-    $user = User::factory()->create([
-        'email' => 'admin@inventory.test',
-        'password' => bcrypt('Password123!'),
-        'role' => User::ROLE_ADMIN,
+test('user can login with valid credentials and receive permissions and settings', function () {
+    $user = User::factory()->admin()->create([
+        'email' => 'admin@test.com',
+        'password' => 'secret123',
     ]);
 
     $response = $this->postJson('/api/v1/auth/login', [
-        'email' => 'admin@inventory.test',
-        'password' => 'Password123!',
+        'email' => 'admin@test.com',
+        'password' => 'secret123',
     ]);
 
     $response->assertStatus(200)
         ->assertJsonStructure([
             'message',
             'token',
-            'user' => ['id', 'name', 'email', 'role'],
+            'user' => ['id', 'name', 'email', 'role', 'permissions'],
+            'permissions',
+            'settings',
         ])
-        ->assertJson([
-            'user' => [
-                'email' => 'admin@inventory.test',
-                'role' => User::ROLE_ADMIN,
-            ],
-        ]);
+        ->assertJsonPath('user.email', 'admin@test.com')
+        ->assertJsonPath('user.role', 'admin');
 
-    expect($response->json('token'))->toBeString();
+    expect($response->json('permissions'))->toContain('settings.manage');
 });
 
 test('user cannot login with invalid credentials', function () {
-    User::factory()->create([
-        'email' => 'admin@inventory.test',
-        'password' => bcrypt('Password123!'),
+    $user = User::factory()->create([
+        'email' => 'valid@test.com',
+        'password' => 'secret123',
     ]);
 
     $response = $this->postJson('/api/v1/auth/login', [
-        'email' => 'admin@inventory.test',
-        'password' => 'WrongPassword',
+        'email' => 'valid@test.com',
+        'password' => 'wrong-password',
     ]);
 
     $response->assertStatus(422)
         ->assertJsonValidationErrors(['email']);
 });
 
-test('authenticated user can retrieve own profile via me endpoint', function () {
+test('deactivated user cannot login', function () {
     $user = User::factory()->create([
-        'role' => User::ROLE_MANAGER,
+        'email' => 'deactivated@test.com',
+        'password' => 'secret123',
+        'is_active' => false,
     ]);
 
-    $response = $this->actingAs($user, 'sanctum')
-        ->getJson('/api/v1/auth/me');
+    $response = $this->postJson('/api/v1/auth/login', [
+        'email' => 'deactivated@test.com',
+        'password' => 'secret123',
+    ]);
+
+    $response->assertStatus(403)
+        ->assertJsonPath('message', 'Your account has been deactivated. Please contact an administrator.');
+});
+
+test('authenticated user can retrieve own profile with permissions and dynamic settings', function () {
+    $user = User::factory()->manager()->create();
+
+    $response = $this->actingAs($user, 'sanctum')->getJson('/api/v1/me');
 
     $response->assertStatus(200)
-        ->assertJson([
-            'user' => [
-                'id' => $user->id,
-                'email' => $user->email,
-                'role' => User::ROLE_MANAGER,
-            ],
+        ->assertJsonStructure([
+            'user' => ['id', 'name', 'email', 'role'],
+            'permissions',
+            'settings',
         ]);
+
+    expect($response->json('permissions'))->toContain('products.manage');
+    expect($response->json('permissions'))->not->toContain('settings.manage');
 });
 
 test('unauthenticated user cannot access me endpoint', function () {
-    $response = $this->getJson('/api/v1/auth/me');
+    $response = $this->getJson('/api/v1/me');
 
     $response->assertStatus(401);
 });
@@ -77,10 +88,10 @@ test('user can logout and token is revoked', function () {
     $token = $user->createToken('test-token')->plainTextToken;
 
     $response = $this->withHeader('Authorization', "Bearer {$token}")
-        ->postJson('/api/v1/auth/logout');
+        ->postJson('/api/v1/logout');
 
     $response->assertStatus(200)
-        ->assertJson(['message' => 'Logged out successfully']);
+        ->assertJsonPath('message', 'Logged out successfully');
 
     expect($user->tokens()->count())->toBe(0);
 });

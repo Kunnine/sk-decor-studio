@@ -19,16 +19,21 @@ class CategoryPolicy
 
     public function create(User $user): bool
     {
-        return $user->hasRole([User::ROLE_ADMIN, User::ROLE_MANAGER]);
+        return $user->isAdmin() || $user->isManager();
     }
 
     public function update(User $user, Category $category): bool
     {
-        return $user->hasRole([User::ROLE_ADMIN, User::ROLE_MANAGER]);
+        return $user->isAdmin() || $user->isManager();
     }
 
     public function delete(User $user, Category $category): bool
     {
-        return $user->hasRole([User::ROLE_ADMIN, User::ROLE_MANAGER]);
+        return $user->isAdmin() || $user->isManager();
+    }
+
+    public function move(User $user, Category $category): bool
+    {
+        return $user->isAdmin() || $user->isManager();
     }
 }

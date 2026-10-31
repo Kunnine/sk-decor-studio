@@ -1,31 +1,33 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #4338CA;
-  --color-primary-hover: #3730A3;
-  --color-primary-light: #EEF2FF;
-  --color-accent: #F59E0B;
-  --color-accent-light: #FEF3C7;
-  --color-accent-hover: #D97706;
+  --color-primary: #4338ca;
+  --color-primary-hover: #3730a3;
+  --color-primary-light: #eef2ff;
+  --color-accent: #f59e0b;
+  --color-accent-light: #fef3c7;
+  --color-accent-hover: #d97706;
 
-  --color-bg-page: #F8FAFC;
-  --color-text-main: #0F172A;
-  --color-text-muted: #64748B;
-  --color-border-main: #E2E8F0;
+  --color-bg-page: #f8fafc;
+  --color-text-main: #0f172a;
+  --color-text-muted: #64748b;
+  --color-border-main: #e2e8f0;
 
-  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-sans:
+    "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    sans-serif;
   --radius-default: 8px;
 }
 
 :root {
-  --primary: #4338CA;
-  --accent: #F59E0B;
+  --primary: #4338ca;
+  --accent: #f59e0b;
 }
 
 body {
   font-family: var(--font-sans);
-  background-color: #F8FAFC;
-  color: #0F172A;
+  background-color: #f8fafc;
+  color: #0f172a;
 }
 
 /* Custom scrollbars that stay minimalist and neutral */
@@ -34,12 +36,12 @@ body {
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #F1F5F9;
+  background: #f1f5f9;
 }
 ::-webkit-scrollbar-thumb {
-  background: #CBD5E1;
+  background: #cbd5e1;
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #94A3B8;
+  background: #94a3b8;
 }

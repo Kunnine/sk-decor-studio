@@ -19,21 +19,21 @@ class ProductPolicy
 
     public function create(User $user): bool
     {
-        return $user->hasRole([User::ROLE_ADMIN, User::ROLE_MANAGER]);
+        return $user->isAdmin() || $user->isManager();
     }
 
     public function update(User $user, Product $product): bool
     {
-        return $user->hasRole([User::ROLE_ADMIN, User::ROLE_MANAGER]);
+        return $user->isAdmin() || $user->isManager();
     }
 
     public function delete(User $user, Product $product): bool
     {
-        return $user->hasRole([User::ROLE_ADMIN, User::ROLE_MANAGER]);
+        return $user->isAdmin() || $user->isManager();
     }
 
     public function import(User $user): bool
     {
-        return $user->hasRole([User::ROLE_ADMIN, User::ROLE_MANAGER]);
+        return $user->isAdmin() || $user->isManager();
     }
 }

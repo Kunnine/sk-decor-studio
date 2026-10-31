@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests\Category;
 
+use App\Models\Category;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class CategoryUpdateRequest extends FormRequest
 {
@@ -10,26 +12,19 @@ class CategoryUpdateRequest extends FormRequest
     {
         $category = $this->route('category');
 
-        return $this->user()->can('update', $category);
+        return $this->user()?->can('update', $category) ?? false;
     }
 
     public function rules(): array
     {
-        $categoryId = $this->route('category')?->id;
+        $categoryId = $this->route('category') instanceof Category ? $this->route('category')->id : $this->route('category');
 
         return [
-            'name' => ['sometimes', 'required', 'string', 'max:120'],
-            'description' => ['nullable', 'string', 'max:500'],
-            'parent_id' => [
-                'nullable',
-                'integer',
-                'exists:categories,id',
-                function ($attribute, $value, $fail) use ($categoryId) {
-                    if ($value && $value == $categoryId) {
-                        $fail('A category cannot be its own parent.');
-                    }
-                },
-            ],
+            'name' => ['sometimes', 'required', 'string', 'max:255'],
+            'slug' => ['sometimes', 'required', 'string', 'max:255', Rule::unique('categories', 'slug')->ignore($categoryId)],
+            'description' => ['nullable', 'string'],
+            'parent_id' => ['nullable', 'integer', 'exists:categories,id', Rule::notIn([$categoryId])],
+            'sort_order' => ['nullable', 'integer', 'min:0'],
         ];
     }
 }

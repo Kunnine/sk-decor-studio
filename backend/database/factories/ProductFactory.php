@@ -4,6 +4,7 @@ namespace Database\Factories;
 
 use App\Models\Category;
 use App\Models\Product;
+use App\Models\Unit;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -23,6 +24,7 @@ class ProductFactory extends Factory
             'name' => ucwords(fake()->words(3, true)),
             'description' => fake()->paragraph(),
             'category_id' => Category::factory(),
+            'unit_id' => Unit::factory(),
             'cost_price' => $cost,
             'sell_price' => $sell,
             'stock_qty' => fake()->numberBetween(15, 100),

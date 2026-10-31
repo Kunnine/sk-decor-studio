@@ -12,22 +12,25 @@ class UserSeeder extends Seeder
     {
         $users = [
             [
-                'name' => 'System Admin',
+                'name' => 'Admin User',
                 'email' => 'admin@inventory.test',
                 'password' => Hash::make('Password123!'),
                 'role' => User::ROLE_ADMIN,
+                'is_active' => true,
             ],
             [
-                'name' => 'Inventory Manager',
+                'name' => 'Manager User',
                 'email' => 'manager@inventory.test',
                 'password' => Hash::make('Password123!'),
                 'role' => User::ROLE_MANAGER,
+                'is_active' => true,
             ],
             [
-                'name' => 'Store Cashier',
+                'name' => 'Cashier User',
                 'email' => 'cashier@inventory.test',
                 'password' => Hash::make('Password123!'),
                 'role' => User::ROLE_CASHIER,
+                'is_active' => true,
             ],
         ];
 

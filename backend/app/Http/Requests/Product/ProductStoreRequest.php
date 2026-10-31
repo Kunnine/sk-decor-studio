@@ -9,7 +9,7 @@ class ProductStoreRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()->can('create', Product::class);
+        return $this->user()?->can('create', Product::class) ?? false;
     }
 
     public function rules(): array
@@ -19,11 +19,13 @@ class ProductStoreRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'category_id' => ['required', 'integer', 'exists:categories,id'],
+            'unit_id' => ['nullable', 'integer', 'exists:units,id'],
             'cost_price' => ['required', 'numeric', 'min:0', 'max:999999999.99'],
             'sell_price' => ['required', 'numeric', 'min:0', 'max:999999999.99'],
             'stock_qty' => ['nullable', 'integer', 'min:0'],
             'reorder_level' => ['nullable', 'integer', 'min:0'],
             'is_active' => ['nullable', 'boolean'],
+            'image' => ['nullable', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048', 'dimensions:min_width=200,min_height=200'],
         ];
     }
 }

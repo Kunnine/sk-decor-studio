@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Storage;
 
 class Product extends Model
 {
@@ -17,34 +18,62 @@ class Product extends Model
         'name',
         'description',
         'category_id',
+        'unit_id',
         'cost_price',
         'sell_price',
         'stock_qty',
         'reorder_level',
+        'image_path',
+        'thumb_path',
         'is_active',
         'low_stock_notified_at',
     ];
 
-    protected function casts(): array
-    {
-        return [
-            'cost_price' => 'decimal:2',
-            'sell_price' => 'decimal:2',
-            'stock_qty' => 'integer',
-            'reorder_level' => 'integer',
-            'is_active' => 'boolean',
-            'low_stock_notified_at' => 'datetime',
-        ];
-    }
+    protected $casts = [
+        'cost_price' => 'decimal:2',
+        'sell_price' => 'decimal:2',
+        'stock_qty' => 'integer',
+        'reorder_level' => 'integer',
+        'is_active' => 'boolean',
+        'low_stock_notified_at' => 'datetime',
+    ];
+
+    protected $appends = [
+        'image_url',
+        'thumb_url',
+    ];
 
     public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class);
     }
 
+    public function unit(): BelongsTo
+    {
+        return $this->belongsTo(Unit::class);
+    }
+
     public function isLowStock(): bool
     {
         return $this->stock_qty <= $this->reorder_level;
+    }
+
+    public function getImageUrlAttribute(): ?string
+    {
+        if ($this->image_path && Storage::disk('public')->exists($this->image_path)) {
+            return Storage::disk('public')->url($this->image_path);
+        }
+
+        return null;
+    }
+
+    public function getThumbUrlAttribute(): ?string
+    {
+        if ($this->thumb_path && Storage::disk('public')->exists($this->thumb_path)) {
+            return Storage::disk('public')->url($this->thumb_path);
+        }
+
+        return null;
     }
 
     public function scopeActive(Builder $query): Builder
@@ -57,15 +86,12 @@ class Product extends Model
         return $query->whereColumn('stock_qty', '<=', 'reorder_level');
     }
 
-    public function scopeSearch(Builder $query, ?string $term): Builder
+    public function scopeSearch(Builder $query, string $term): Builder
     {
-        if (blank($term)) {
-            return $query;
-        }
-
         return $query->where(function (Builder $q) use ($term) {
-            $q->where('sku', 'like', "%{$term}%")
-                ->orWhere('name', 'like', "%{$term}%");
+            $q->where('name', 'like', "%{$term}%")
+                ->orWhere('sku', 'like', "%{$term}%")
+                ->orWhere('description', 'like', "%{$term}%");
         });
     }
 }

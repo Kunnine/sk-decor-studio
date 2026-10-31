@@ -1,7 +1,7 @@
-import React from 'react';
-import { AlertCircle } from 'lucide-react';
-import { Modal } from './Modal';
-import { Button } from './Button';
+import React from "react";
+import { AlertCircle } from "lucide-react";
+import { Modal } from "./Modal";
+import { Button } from "./Button";
 
 export interface ConfirmDialogProps {
   isOpen: boolean;
@@ -20,8 +20,8 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   onConfirm,
   title,
   message,
-  confirmLabel = 'Confirm Action',
-  cancelLabel = 'Cancel',
+  confirmLabel = "Confirm Action",
+  cancelLabel = "Cancel",
   isLoading = false,
 }) => {
   return (
@@ -32,10 +32,20 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
       maxWidth="sm"
       footer={
         <>
-          <Button variant="outline" size="sm" onClick={onClose} disabled={isLoading}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onClose}
+            disabled={isLoading}
+          >
             {cancelLabel}
           </Button>
-          <Button variant="danger" size="sm" onClick={onConfirm} isLoading={isLoading}>
+          <Button
+            variant="danger"
+            size="sm"
+            onClick={onConfirm}
+            isLoading={isLoading}
+          >
             {confirmLabel}
           </Button>
         </>

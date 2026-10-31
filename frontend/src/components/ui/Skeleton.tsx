@@ -1,10 +1,12 @@
-import React from 'react';
+import React from "react";
 
 export interface SkeletonProps {
   className?: string;
 }
 
-export const Skeleton: React.FC<SkeletonProps> = ({ className = 'h-4 w-full' }) => {
+export const Skeleton: React.FC<SkeletonProps> = ({
+  className = "h-4 w-full",
+}) => {
   return (
     <div
       className={`animate-pulse rounded bg-slate-200/80 ${className}`}

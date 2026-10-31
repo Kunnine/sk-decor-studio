@@ -7,9 +7,6 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('products', function (Blueprint $table) {
@@ -18,16 +15,22 @@ return new class extends Migration
             $table->string('name', 255);
             $table->text('description')->nullable();
             $table->foreignId('category_id')->constrained('categories')->restrictOnDelete();
+            $table->foreignId('unit_id')->nullable()->constrained('units')->restrictOnDelete();
             $table->decimal('cost_price', 12, 2)->default(0.00);
             $table->decimal('sell_price', 12, 2)->default(0.00);
-            $table->integer('stock_qty')->default(0);
-            $table->integer('reorder_level')->default(10);
+            $table->unsignedInteger('stock_qty')->default(0);
+            $table->unsignedInteger('reorder_level')->default(10);
+            $table->string('image_path')->nullable();
+            $table->string('thumb_path')->nullable();
             $table->boolean('is_active')->default(true);
             $table->timestamp('low_stock_notified_at')->nullable();
             $table->softDeletes();
             $table->timestamps();
 
-            $table->index(['name', 'sku']);
+            $table->index('category_id');
+            $table->index('unit_id');
+            $table->index('name');
+            $table->index('sku');
             $table->index(['category_id', 'is_active']);
             $table->index(['is_active', 'stock_qty']);
         });
@@ -38,9 +41,6 @@ return new class extends Migration
         }
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('products');
