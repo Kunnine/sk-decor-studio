@@ -150,3 +150,41 @@ test('soft deleting product preserves its image files', function () {
     // Files are preserved according to spec
     Storage::disk('public')->assertExists($mainPath);
 });
+
+test('product update endpoint with remove_image clears stored image files', function () {
+    Storage::fake('public');
+
+    $manager = User::factory()->manager()->create();
+    $product = Product::factory()->create();
+
+    $file = UploadedFile::fake()->image('temporary.png', 400, 400);
+    $this->actingAs($manager, 'sanctum')
+        ->postJson("/api/v1/products/{$product->id}/image", ['image' => $file]);
+
+    $product->refresh();
+    $mainPath = $product->image_path;
+    $thumbPath = $product->thumb_path;
+    expect($mainPath)->not->toBeNull();
+
+    // Now update product with remove_image=1
+    $response = $this->actingAs($manager, 'sanctum')
+        ->putJson("/api/v1/products/{$product->id}", [
+            'sku' => $product->sku,
+            'name' => $product->name,
+            'category_id' => $product->category_id,
+            'cost_price' => $product->cost_price,
+            'sell_price' => $product->sell_price,
+            'stock_qty' => $product->stock_qty,
+            'reorder_level' => $product->reorder_level,
+            'is_active' => true,
+            'remove_image' => true,
+        ]);
+
+    $response->assertStatus(200);
+
+    $product->refresh();
+    expect($product->image_path)->toBeNull();
+    expect($product->thumb_path)->toBeNull();
+    Storage::disk('public')->assertMissing($mainPath);
+    Storage::disk('public')->assertMissing($thumbPath);
+});

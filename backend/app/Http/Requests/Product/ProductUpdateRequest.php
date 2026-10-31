@@ -31,6 +31,7 @@ class ProductUpdateRequest extends FormRequest
             'reorder_level' => ['sometimes', 'required', 'integer', 'min:0'],
             'is_active' => ['sometimes', 'required', 'boolean'],
             'image' => ['nullable', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048', 'dimensions:min_width=200,min_height=200'],
+            'remove_image' => ['nullable', 'boolean'],
         ];
     }
 }

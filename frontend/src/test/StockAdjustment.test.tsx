@@ -208,4 +208,22 @@ describe("Stock Adjustment & Product Details", () => {
       expect(within(dialog).getByText("+5")).toBeInTheDocument();
     });
   });
+
+  it("renders Add Product modal with ImageUploader drop zone", async () => {
+    renderWithProviders(<Products />);
+
+    await waitFor(() => {
+      expect(screen.getByText("SKU-TEST-100")).toBeInTheDocument();
+    });
+
+    // Click Add Product button
+    const addBtn = screen.getByRole("button", { name: /Add Product/i });
+    fireEvent.click(addBtn);
+
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText("Add New Product")).toBeInTheDocument();
+    expect(within(dialog).getByText("Product Image")).toBeInTheDocument();
+    expect(within(dialog).getByText(/click to upload/i)).toBeInTheDocument();
+    expect(within(dialog).getByText(/webp, png, or jpg/i)).toBeInTheDocument();
+  });
 });

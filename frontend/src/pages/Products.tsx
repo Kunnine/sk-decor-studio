@@ -39,6 +39,7 @@ import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { TableSkeleton } from "../components/ui/Skeleton";
 import { EmptyState } from "../components/ui/EmptyState";
 import { Badge } from "../components/ui/Badge";
+import { ImageUploader } from "../components/ui/ImageUploader";
 
 const productSchema = z.object({
   sku: z.string().min(2, "SKU must be at least 2 characters").max(64),
@@ -75,6 +76,9 @@ export const Products: React.FC = () => {
   // Modal states
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
+  const [removeExistingImage, setRemoveExistingImage] =
+    useState<boolean>(false);
   const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -232,6 +236,8 @@ export const Products: React.FC = () => {
 
   const openCreateModal = () => {
     setEditingProduct(null);
+    setSelectedImageFile(null);
+    setRemoveExistingImage(false);
     reset({
       sku: "",
       name: "",
@@ -248,6 +254,8 @@ export const Products: React.FC = () => {
 
   const openEditModal = (prod: Product) => {
     setEditingProduct(prod);
+    setSelectedImageFile(null);
+    setRemoveExistingImage(false);
     reset({
       sku: prod.sku,
       name: prod.name,
@@ -265,11 +273,17 @@ export const Products: React.FC = () => {
   const closeFormModal = () => {
     setIsFormModalOpen(false);
     setEditingProduct(null);
+    setSelectedImageFile(null);
+    setRemoveExistingImage(false);
     reset();
   };
 
   const onFormSubmit = (formData: ProductFormData) => {
-    saveMutation.mutate(formData);
+    saveMutation.mutate({
+      ...formData,
+      image: selectedImageFile,
+      remove_image: removeExistingImage,
+    });
   };
 
   const openAdjustmentModal = (prod: Product) => {
@@ -514,8 +528,26 @@ export const Products: React.FC = () => {
                       <td className="py-3 px-4 font-mono font-semibold text-slate-900">
                         {prod.sku}
                       </td>
-                      <td className="py-3 px-4 font-medium text-slate-900 max-w-xs truncate">
-                        {prod.name}
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-md border border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden shrink-0">
+                            {prod.thumb_url ? (
+                              <img
+                                src={prod.thumb_url}
+                                alt={prod.name}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <Package className="w-4 h-4 text-slate-300 stroke-[1.5]" />
+                            )}
+                          </div>
+                          <span
+                            className="font-medium text-slate-900 max-w-xs truncate"
+                            title={prod.name}
+                          >
+                            {prod.name}
+                          </span>
+                        </div>
                       </td>
                       <td className="py-3 px-4 text-slate-600">
                         {prod.category?.name || "—"}
@@ -754,6 +786,29 @@ export const Products: React.FC = () => {
 
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">
+              Product Image
+            </label>
+            <ImageUploader
+              currentImageUrl={
+                removeExistingImage
+                  ? null
+                  : editingProduct?.image_url || editingProduct?.thumb_url
+              }
+              onFileSelect={(file) => {
+                setSelectedImageFile(file);
+                if (file) {
+                  setRemoveExistingImage(false);
+                }
+              }}
+              onRemoveExisting={() => {
+                setSelectedImageFile(null);
+                setRemoveExistingImage(true);
+              }}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">
               Description
             </label>
             <textarea
@@ -983,6 +1038,39 @@ export const Products: React.FC = () => {
             {/* Tab 1: Details */}
             {detailTab === "details" && (
               <div className="space-y-4 text-xs text-slate-700">
+                {/* Product Image & Basic Info Card */}
+                <div className="flex flex-col sm:flex-row gap-4 p-3.5 bg-slate-50 rounded-lg border border-slate-200 items-center sm:items-start">
+                  <div className="w-24 h-24 rounded-lg border border-slate-200 bg-white flex items-center justify-center overflow-hidden shrink-0 shadow-xs">
+                    {detailProduct.image_url || detailProduct.thumb_url ? (
+                      <img
+                        src={
+                          detailProduct.image_url ||
+                          detailProduct.thumb_url ||
+                          ""
+                        }
+                        alt={detailProduct.name}
+                        className="w-full h-full object-contain"
+                      />
+                    ) : (
+                      <Package className="w-8 h-8 text-slate-300 stroke-[1.5]" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0 text-center sm:text-left">
+                    <h4
+                      className="text-sm font-bold text-slate-900 truncate"
+                      title={detailProduct.name}
+                    >
+                      {detailProduct.name}
+                    </h4>
+                    <p className="text-xs font-mono text-slate-500 mt-0.5">
+                      SKU: {detailProduct.sku}
+                    </p>
+                    <p className="text-xs text-slate-600 mt-2 line-clamp-2">
+                      {detailProduct.description || "No description provided."}
+                    </p>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
                     <span className="text-[11px] text-slate-500 block">

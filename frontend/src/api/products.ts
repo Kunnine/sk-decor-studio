@@ -30,6 +30,7 @@ export interface ProductPayload {
   reorder_level?: number;
   is_active?: boolean;
   image?: File | null;
+  remove_image?: boolean;
 }
 
 export const productApi = {

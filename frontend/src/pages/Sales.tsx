@@ -15,6 +15,7 @@ import {
   ShoppingBag,
   Clock,
   RotateCcw,
+  Package,
 } from "lucide-react";
 import { saleApi, SaleFilters } from "../api/sales";
 import { Sale } from "../types";
@@ -453,11 +454,26 @@ export const Sales: React.FC = () => {
                     {selectedSale.items?.map((item) => (
                       <tr key={item.id}>
                         <td className="px-3 py-2">
-                          <div className="font-semibold text-slate-900">
-                            {item.product?.name}
-                          </div>
-                          <div className="text-[10px] text-slate-400 font-mono">
-                            {item.product?.sku}
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded border border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden shrink-0">
+                              {item.product?.thumb_url ? (
+                                <img
+                                  src={item.product.thumb_url}
+                                  alt={item.product.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <Package className="w-3.5 h-3.5 text-slate-300" />
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="font-semibold text-slate-900 truncate max-w-xs">
+                                {item.product?.name}
+                              </div>
+                              <div className="text-[10px] text-slate-400 font-mono">
+                                {item.product?.sku}
+                              </div>
+                            </div>
                           </div>
                         </td>
                         <td className="px-3 py-2 text-center font-semibold">

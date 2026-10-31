@@ -116,12 +116,14 @@ class ProductController extends Controller
         $data = $request->validated();
 
         $imageFile = $request->file('image');
-        unset($data['image']);
+        unset($data['image'], $data['remove_image']);
 
         $product->update($data);
 
         if ($imageFile) {
             $imageService->storeImage($product, $imageFile);
+        } elseif ($request->boolean('remove_image')) {
+            $imageService->deleteImageFiles($product);
         }
 
         $product->load(['category', 'unit']);

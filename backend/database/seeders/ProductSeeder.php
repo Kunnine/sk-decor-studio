@@ -11,6 +11,7 @@ use App\Models\Unit;
 use App\Models\User;
 use App\Services\StockService;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Storage;
 
 class ProductSeeder extends Seeder
 {
@@ -107,22 +108,36 @@ class ProductSeeder extends Seeder
 
         $createdItems = [];
 
+        $categoryNames = Category::pluck('name', 'id')->toArray();
+
+        $existingPurchase = Purchase::where('ref_no', 'PO-2026-INIT-001')->first();
+        $isAlreadyReceived = $existingPurchase && $existingPurchase->status === Purchase::STATUS_RECEIVED;
+
         foreach ($products as $pData) {
             $initialStock = $pData['initial_stock'];
             unset($pData['initial_stock']);
-            $pData['stock_qty'] = 0;
-            $pData['avg_cost'] = $pData['cost_price'];
+
+            if (! $isAlreadyReceived) {
+                $pData['stock_qty'] = 0;
+                $pData['avg_cost'] = $pData['cost_price'];
+            }
 
             $product = Product::updateOrCreate(
                 ['sku' => $pData['sku']],
                 $pData
             );
 
+            $this->createDemoImage($product, $categoryNames[$product->category_id] ?? 'Hardware');
+
             $createdItems[] = [
                 'product' => $product,
                 'qty' => $initialStock,
                 'cost' => $pData['cost_price'],
             ];
+        }
+
+        if ($isAlreadyReceived) {
+            return;
         }
 
         // Create and receive initial purchase to establish trustworthy movements & stock balances
@@ -158,5 +173,85 @@ class ProductSeeder extends Seeder
         /** @var StockService $stockService */
         $stockService = app(StockService::class);
         $stockService->receive($initialPurchase, $adminUser);
+    }
+
+    protected function createDemoImage(Product $product, string $categoryName): void
+    {
+        $year = now()->format('Y');
+        $month = now()->format('m');
+        $dir = "products/{$year}/{$month}";
+        $hash = md5($product->sku);
+        $mainPath = "{$dir}/{$hash}.webp";
+        $thumbPath = "{$dir}/{$hash}_thumb.webp";
+
+        if (! Storage::disk('public')->exists($mainPath) && function_exists('imagecreatetruecolor') && function_exists('imagewebp')) {
+            // Create 800x800 main image
+            $img = imagecreatetruecolor(800, 800);
+            $bg = imagecolorallocate($img, 248, 250, 252); // #F8FAFC
+            imagefill($img, 0, 0, $bg);
+
+            $cardBg = imagecolorallocate($img, 255, 255, 255);
+            $borderColor = imagecolorallocate($img, 226, 232, 240); // #E2E8F0
+            $primaryColor = imagecolorallocate($img, 67, 56, 202); // #4338CA
+            $slateText = imagecolorallocate($img, 15, 23, 42); // #0F172A
+            $slateMuted = imagecolorallocate($img, 100, 116, 139); // #64748B
+            $white = imagecolorallocate($img, 255, 255, 255);
+
+            imagefilledrectangle($img, 60, 60, 740, 740, $cardBg);
+            imagerectangle($img, 60, 60, 740, 740, $borderColor);
+
+            // Indigo header bar
+            imagefilledrectangle($img, 60, 60, 740, 76, $primaryColor);
+
+            // Icon square
+            imagefilledrectangle($img, 340, 260, 460, 380, $primaryColor);
+            imagestring($img, 5, 375, 310, strtoupper(substr($product->sku, 0, 3)), $white);
+
+            // Text labels
+            imagestring($img, 5, 100, 440, substr($product->name, 0, 45), $slateText);
+            imagestring($img, 4, 100, 480, 'Category: '.$categoryName, $slateMuted);
+            imagestring($img, 4, 100, 510, 'SKU: '.$product->sku, $primaryColor);
+            imagestring($img, 4, 100, 540, 'Retail Price: $'.number_format((float) $product->sell_price, 2), $slateText);
+
+            ob_start();
+            imagewebp($img, null, 85);
+            $mainData = ob_get_clean();
+            imagedestroy($img);
+
+            // Create 200x200 thumb image
+            $thumb = imagecreatetruecolor(200, 200);
+            $thumbBg = imagecolorallocate($thumb, 248, 250, 252);
+            imagefill($thumb, 0, 0, $thumbBg);
+
+            $tPrimary = imagecolorallocate($thumb, 67, 56, 202);
+            $tCard = imagecolorallocate($thumb, 255, 255, 255);
+            $tBorder = imagecolorallocate($thumb, 226, 232, 240);
+            $tWhite = imagecolorallocate($thumb, 255, 255, 255);
+            $tText = imagecolorallocate($thumb, 15, 23, 42);
+
+            imagefilledrectangle($thumb, 10, 10, 190, 190, $tCard);
+            imagerectangle($thumb, 10, 10, 190, 190, $tBorder);
+            imagefilledrectangle($thumb, 10, 10, 190, 16, $tPrimary);
+
+            imagefilledrectangle($thumb, 75, 55, 125, 105, $tPrimary);
+            imagestring($thumb, 4, 85, 72, strtoupper(substr($product->sku, 0, 3)), $tWhite);
+            imagestring($thumb, 2, 20, 125, substr($product->name, 0, 22), $tText);
+            imagestring($thumb, 2, 20, 145, '$'.number_format((float) $product->sell_price, 2), $tPrimary);
+
+            ob_start();
+            imagewebp($thumb, null, 85);
+            $thumbData = ob_get_clean();
+            imagedestroy($thumb);
+
+            Storage::disk('public')->put($mainPath, $mainData);
+            Storage::disk('public')->put($thumbPath, $thumbData);
+        }
+
+        if (Storage::disk('public')->exists($mainPath) && Storage::disk('public')->exists($thumbPath)) {
+            $product->update([
+                'image_path' => $mainPath,
+                'thumb_path' => $thumbPath,
+            ]);
+        }
     }
 }
