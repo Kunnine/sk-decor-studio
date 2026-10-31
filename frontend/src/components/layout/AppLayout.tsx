@@ -11,6 +11,11 @@ import {
   Bell,
   Menu,
   X,
+  ShoppingCart,
+  Receipt,
+  UserCheck,
+  Truck,
+  ArrowLeftRight,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { Badge } from "../ui/Badge";
@@ -32,10 +37,46 @@ export const AppLayout: React.FC = () => {
       visible: true,
     },
     {
+      label: "POS Checkout",
+      to: "/pos",
+      icon: ShoppingCart,
+      visible: hasPermission("sales.create"),
+    },
+    {
+      label: "Sales Records",
+      to: "/sales",
+      icon: Receipt,
+      visible: hasPermission("sales.view") || hasPermission("sales.view_own"),
+    },
+    {
+      label: "Customers",
+      to: "/customers",
+      icon: UserCheck,
+      visible: hasPermission("customers.view"),
+    },
+    {
       label: "Products",
       to: "/products",
       icon: Package,
       visible: hasPermission("products.view"),
+    },
+    {
+      label: "Purchases",
+      to: "/purchases",
+      icon: Truck,
+      visible: hasPermission("purchases.view"),
+    },
+    {
+      label: "Suppliers",
+      to: "/suppliers",
+      icon: Users,
+      visible: hasPermission("suppliers.view"),
+    },
+    {
+      label: "Stock History",
+      to: "/stock-movements",
+      icon: ArrowLeftRight,
+      visible: hasPermission("stock_movements.view"),
     },
     {
       label: "Categories",
@@ -50,7 +91,7 @@ export const AppLayout: React.FC = () => {
       visible: hasPermission("units.view"),
     },
     {
-      label: "Users",
+      label: "Staff Users",
       to: "/users",
       icon: Users,
       visible: hasPermission("users.manage"),

@@ -175,4 +175,21 @@ export const productApi = {
     });
     return res.data;
   },
+
+  importCsv: async (file: File): Promise<CsvImportCommitResult> => {
+    const preview = await productApi.importPreview(file);
+    return productApi.importCommit({
+      preview_token: preview.preview_token,
+      duplicate_sku_action: "update",
+      create_missing_categories: true,
+      create_missing_units: true,
+    });
+  },
+
+  posSearch: async (q: string): Promise<Product[]> => {
+    const res = await api.get<{ data: Product[] }>("/products/pos-search", {
+      params: { q },
+    });
+    return res.data.data;
+  },
 };

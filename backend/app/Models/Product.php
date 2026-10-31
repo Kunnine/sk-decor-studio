@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Storage;
 
@@ -20,6 +21,7 @@ class Product extends Model
         'category_id',
         'unit_id',
         'cost_price',
+        'avg_cost',
         'sell_price',
         'stock_qty',
         'reorder_level',
@@ -31,6 +33,7 @@ class Product extends Model
 
     protected $casts = [
         'cost_price' => 'decimal:2',
+        'avg_cost' => 'decimal:2',
         'sell_price' => 'decimal:2',
         'stock_qty' => 'integer',
         'reorder_level' => 'integer',
@@ -51,6 +54,21 @@ class Product extends Model
     public function unit(): BelongsTo
     {
         return $this->belongsTo(Unit::class);
+    }
+
+    public function movements(): HasMany
+    {
+        return $this->hasMany(StockMovement::class);
+    }
+
+    public function purchaseItems(): HasMany
+    {
+        return $this->hasMany(PurchaseItem::class);
+    }
+
+    public function saleItems(): HasMany
+    {
+        return $this->hasMany(SaleItem::class);
     }
 
     public function isLowStock(): bool

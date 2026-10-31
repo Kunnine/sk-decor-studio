@@ -219,6 +219,39 @@ class ProductController extends Controller
         ]);
     }
 
+    public function posSearch(Request $request): JsonResponse
+    {
+        $this->authorize('viewAny', Product::class);
+
+        $term = trim($request->input('q', ''));
+
+        $query = Product::query()
+            ->with(['category', 'unit'])
+            ->active()
+            ->where('stock_qty', '>', 0);
+
+        if (! empty($term)) {
+            $query->where(function ($q) use ($term) {
+                $q->where('sku', $term)
+                    ->orWhere('sku', 'like', "%{$term}%")
+                    ->orWhere('name', 'like', "%{$term}%");
+            });
+
+            $products = $query->orderByRaw('CASE WHEN sku = ? THEN 0 WHEN sku LIKE ? THEN 1 ELSE 2 END', [$term, "{$term}%"])
+                ->orderBy('name')
+                ->limit(20)
+                ->get();
+        } else {
+            $products = $query->orderBy('name')
+                ->limit(20)
+                ->get();
+        }
+
+        return response()->json([
+            'data' => ProductResource::collection($products),
+        ]);
+    }
+
     public function lowStock(Request $request): AnonymousResourceCollection
     {
         $this->authorize('viewAny', Product::class);

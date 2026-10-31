@@ -9,6 +9,12 @@ import { Categories } from "./pages/Categories";
 import { Units } from "./pages/Units";
 import { Users } from "./pages/Users";
 import { Settings } from "./pages/Settings";
+import { Purchases } from "./pages/Purchases";
+import { Suppliers } from "./pages/Suppliers";
+import { StockMovements } from "./pages/StockMovements";
+import { Customers } from "./pages/Customers";
+import { Pos } from "./pages/Pos";
+import { Sales } from "./pages/Sales";
 
 // Route protector checking token and authentication state
 const ProtectedRoute: React.FC = () => {
@@ -46,10 +52,15 @@ const PublicOnlyRoute: React.FC = () => {
 };
 
 // Permission Guard Route
-const PermissionRoute: React.FC<{ permission: string }> = ({ permission }) => {
+const PermissionRoute: React.FC<{ permission: string | string[] }> = ({
+  permission,
+}) => {
   const { hasPermission } = useAuth();
 
-  if (!hasPermission(permission)) {
+  const permissions = Array.isArray(permission) ? permission : [permission];
+  const isAllowed = permissions.some((p) => hasPermission(p));
+
+  if (!isAllowed) {
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -81,8 +92,32 @@ export const router = createBrowserRouter([
             element: <Dashboard />,
           },
           {
+            path: "/pos",
+            element: <Pos />,
+          },
+          {
+            path: "/sales",
+            element: <Sales />,
+          },
+          {
+            path: "/customers",
+            element: <Customers />,
+          },
+          {
             path: "/products",
             element: <Products />,
+          },
+          {
+            path: "/purchases",
+            element: <Purchases />,
+          },
+          {
+            path: "/suppliers",
+            element: <Suppliers />,
+          },
+          {
+            path: "/stock-movements",
+            element: <StockMovements />,
           },
           {
             path: "/categories",

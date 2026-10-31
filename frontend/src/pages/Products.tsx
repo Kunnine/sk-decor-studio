@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -8,23 +7,28 @@ import {
   Package,
   Plus,
   Search,
+  Filter,
   Edit2,
   Trash2,
-  Eye,
   UploadCloud,
   Download,
   AlertTriangle,
   ChevronLeft,
   ChevronRight,
-  ArrowUpDown,
-  ToggleLeft,
-  ToggleRight,
+  CheckCircle,
   FileSpreadsheet,
+  Eye,
+  SlidersHorizontal,
+  ArrowUpRight,
+  ArrowDownRight,
+  ArrowLeftRight,
+  AlertCircle,
 } from "lucide-react";
-import { productApi, ProductPayload } from "../api/products";
+import { productApi, ProductFilters, ProductPayload } from "../api/products";
 import { categoryApi } from "../api/categories";
-import { unitApi } from "../api/units";
-import { Product, CsvImportPreview } from "../types";
+import { adjustmentApi } from "../api/adjustments";
+import { movementApi } from "../api/movements";
+import { Product, CsvImportResult, StockMovement } from "../types";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { Button } from "../components/ui/Button";
@@ -35,14 +39,12 @@ import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { TableSkeleton } from "../components/ui/Skeleton";
 import { EmptyState } from "../components/ui/EmptyState";
 import { Badge } from "../components/ui/Badge";
-import { ImageUploader } from "../components/ui/ImageUploader";
 
 const productSchema = z.object({
   sku: z.string().min(2, "SKU must be at least 2 characters").max(64),
   name: z.string().min(2, "Product name is required").max(255),
   description: z.string().optional().nullable(),
   category_id: z.number().min(1, "Please select a valid category"),
-  unit_id: z.number().nullable().optional(),
   cost_price: z.number().min(0, "Cost price cannot be negative"),
   sell_price: z.number().min(0, "Sell price cannot be negative"),
   stock_qty: z.number().int().min(0, "Stock cannot be negative"),
@@ -53,100 +55,66 @@ const productSchema = z.object({
 type ProductFormData = z.infer<typeof productSchema>;
 
 export const Products: React.FC = () => {
-  const { settings, formatMoney, hasPermission } = useAuth();
+  const { hasRole } = useAuth();
+  const canManage = hasRole(["admin", "manager"]);
   const queryClient = useQueryClient();
   const { addToast } = useToast();
-  const [searchParams, setSearchParams] = useSearchParams();
 
-  const canManage = hasPermission("products.manage");
-  const canImport = hasPermission("products.import");
-  const canViewCost = hasPermission("products.cost_view");
-
-  // URL state synchronization
-  const search = searchParams.get("search") || "";
-  const categoryFilter = searchParams.get("category_id") || "";
-  const unitFilter = searchParams.get("unit_id") || "";
-  const statusFilter = searchParams.get("is_active") || "";
-  const lowStockFilter = searchParams.get("low_stock") === "true";
-  const sortBy = searchParams.get("sort_by") || "created_at";
-  const sortOrder =
-    (searchParams.get("sort_order") as "asc" | "desc") || "desc";
-  const page = parseInt(searchParams.get("page") || "1", 10);
-  const perPage = 10;
-
-  const updateFilters = (newParams: Record<string, string | null>) => {
-    const next = new URLSearchParams(searchParams);
-    Object.entries(newParams).forEach(([key, val]) => {
-      if (val === null || val === "") {
-        next.delete(key);
-      } else {
-        next.set(key, val);
-      }
-    });
-    setSearchParams(next);
-  };
+  // Filters state
+  const [filters, setFilters] = useState<ProductFilters>({
+    page: 1,
+    per_page: 10,
+    search: "",
+    category_id: "",
+    is_active: "",
+    low_stock: false,
+    sort_by: "created_at",
+    sort_order: "desc",
+  });
 
   // Modal states
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [detailProduct, setDetailProduct] = useState<Product | null>(null);
   const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
-  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
-  const [removeExistingImage, setRemoveExistingImage] = useState(false);
-
-  // CSV Import states
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
-  const [importPreviewData, setImportPreviewData] =
-    useState<CsvImportPreview | null>(null);
-  const [duplicateAction, setDuplicateAction] = useState<"skip" | "update">(
-    "skip",
+  const [importResult, setImportResult] = useState<CsvImportResult | null>(
+    null,
   );
-  const [createMissingCats, setCreateMissingCats] = useState(true);
-  const [createMissingUnits, setCreateMissingUnits] = useState(true);
 
-  // Queries
+  // Stock Adjustment state
+  const [adjustingProduct, setAdjustingProduct] = useState<Product | null>(
+    null,
+  );
+  const [adjustmentDelta, setAdjustmentDelta] = useState<number>(0);
+  const [adjustmentReason, setAdjustmentReason] = useState<string>("");
+  const [adjustmentError, setAdjustmentError] = useState<string | null>(null);
+
+  // Detail & Stock History state
+  const [detailProduct, setDetailProduct] = useState<Product | null>(null);
+  const [detailTab, setDetailTab] = useState<"details" | "history">("details");
+
+  // Fetch categories for dropdown
   const { data: categoriesData } = useQuery({
     queryKey: ["categories-all"],
     queryFn: () => categoryApi.list({ all: true }),
   });
 
-  const { data: unitsData } = useQuery({
-    queryKey: ["units-all"],
-    queryFn: () => unitApi.list({ all: true }),
-  });
-
+  // Fetch products
   const { data, isLoading } = useQuery({
-    queryKey: [
-      "products",
-      {
-        page,
-        per_page: perPage,
-        search,
-        category_id: categoryFilter,
-        unit_id: unitFilter,
-        is_active: statusFilter,
-        low_stock: lowStockFilter,
-        sort_by: sortBy,
-        sort_order: sortOrder,
-      },
-    ],
-    queryFn: () =>
-      productApi.list({
-        page,
-        per_page: perPage,
-        search: search || undefined,
-        category_id: categoryFilter ? Number(categoryFilter) : undefined,
-        unit_id: unitFilter ? Number(unitFilter) : undefined,
-        is_active: statusFilter !== "" ? statusFilter : undefined,
-        low_stock: lowStockFilter ? true : undefined,
-        sort_by: sortBy,
-        sort_order: sortOrder,
-      }),
+    queryKey: ["products", filters],
+    queryFn: () => productApi.list(filters),
   });
 
-  const allCategories = (categoriesData as any)?.data || [];
-  const allUnits = (unitsData as any)?.data || [];
+  // Fetch movements for selected detail product when history tab is active
+  const { data: detailMovementsData, isLoading: isDetailMovementsLoading } =
+    useQuery({
+      queryKey: ["product-movements", detailProduct?.id],
+      queryFn: () =>
+        movementApi.list({ product_id: detailProduct!.id, per_page: 50 }),
+      enabled: Boolean(detailProduct && detailTab === "history"),
+    });
+
   const products = data?.data || [];
   const meta = data?.meta;
 
@@ -155,95 +123,21 @@ export const Products: React.FC = () => {
     register,
     handleSubmit,
     reset,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm<ProductFormData>({
     resolver: zodResolver(productSchema),
   });
 
-  const openCreateModal = () => {
-    setEditingProduct(null);
-    setSelectedImageFile(null);
-    setRemoveExistingImage(false);
-    reset({
-      sku: "",
-      name: "",
-      description: "",
-      category_id: allCategories[0]?.id || 1,
-      unit_id: allUnits[0]?.id || null,
-      cost_price: 0,
-      sell_price: 0,
-      stock_qty: 0,
-      reorder_level: Number(settings?.default_reorder_level ?? 10),
-      is_active: true,
-    });
-    setIsFormModalOpen(true);
-  };
-
-  const openEditModal = (p: Product) => {
-    setEditingProduct(p);
-    setSelectedImageFile(null);
-    setRemoveExistingImage(false);
-    reset({
-      sku: p.sku,
-      name: p.name,
-      description: p.description || "",
-      category_id: p.category_id,
-      unit_id: p.unit_id ?? null,
-      cost_price: p.cost_price ? Number(p.cost_price) : 0,
-      sell_price: Number(p.sell_price),
-      stock_qty: p.stock_qty,
-      reorder_level: p.reorder_level,
-      is_active: p.is_active,
-    });
-    setIsFormModalOpen(true);
-  };
-
-  const closeFormModal = () => {
-    setIsFormModalOpen(false);
-    setEditingProduct(null);
-    setSelectedImageFile(null);
-    setRemoveExistingImage(false);
-    reset();
-  };
-
-  // Mutations
-  const invalidateProductQueries = () => {
-    queryClient.invalidateQueries({ queryKey: ["products"] });
-    queryClient.invalidateQueries({ queryKey: ["dashboard-total-products"] });
-    queryClient.invalidateQueries({ queryKey: ["dashboard-active-products"] });
-    queryClient.invalidateQueries({ queryKey: ["dashboard-low-stock"] });
-  };
-
+  // Save (Create / Update) Mutation
   const saveMutation = useMutation({
-    mutationFn: async (formData: ProductFormData) => {
-      const payload: ProductPayload = {
-        sku: formData.sku,
-        name: formData.name,
-        description: formData.description,
-        category_id: formData.category_id,
-        unit_id: formData.unit_id ? Number(formData.unit_id) : null,
-        cost_price: formData.cost_price,
-        sell_price: formData.sell_price,
-        stock_qty: formData.stock_qty,
-        reorder_level: formData.reorder_level,
-        is_active: formData.is_active,
-        image: selectedImageFile,
-      };
-
+    mutationFn: (payload: ProductPayload) => {
       if (editingProduct) {
-        if (
-          removeExistingImage &&
-          editingProduct.image_url &&
-          !selectedImageFile
-        ) {
-          await productApi.deleteImage(editingProduct.id);
-        }
         return productApi.update(editingProduct.id, payload);
       }
       return productApi.create(payload);
     },
     onSuccess: (res) => {
-      invalidateProductQueries();
+      queryClient.invalidateQueries({ queryKey: ["products"] });
       addToast({
         title: editingProduct ? "Product Updated" : "Product Created",
         message: res.message,
@@ -252,50 +146,21 @@ export const Products: React.FC = () => {
       closeFormModal();
     },
     onError: (err: any) => {
+      const msg =
+        err.response?.data?.message || "Failed to save product details.";
       addToast({
-        title: "Error Saving Product",
-        message:
-          err.response?.data?.message || "Failed to save product details.",
+        title: "Save Failed",
+        message: msg,
         type: "error",
       });
     },
   });
 
-  const toggleActiveMutation = useMutation({
-    mutationFn: (id: number) => productApi.toggleActive(id),
-    onMutate: async (id: number) => {
-      await queryClient.cancelQueries({ queryKey: ["products"] });
-      const previous = queryClient.getQueryData(["products"]);
-      queryClient.setQueriesData({ queryKey: ["products"] }, (old: any) => {
-        if (!old?.data) return old;
-        return {
-          ...old,
-          data: old.data.map((p: Product) =>
-            p.id === id ? { ...p, is_active: !p.is_active } : p,
-          ),
-        };
-      });
-      return { previous };
-    },
-    onError: (_err, _id, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(["products"], context.previous);
-      }
-      addToast({
-        title: "Update Failed",
-        message: "Could not toggle product status.",
-        type: "error",
-      });
-    },
-    onSettled: () => {
-      invalidateProductQueries();
-    },
-  });
-
+  // Delete Mutation
   const deleteMutation = useMutation({
     mutationFn: (id: number) => productApi.delete(id),
     onSuccess: (res) => {
-      invalidateProductQueries();
+      queryClient.invalidateQueries({ queryKey: ["products"] });
       addToast({
         title: "Product Deleted",
         message: res.message,
@@ -306,457 +171,424 @@ export const Products: React.FC = () => {
     onError: (err: any) => {
       addToast({
         title: "Delete Failed",
-        message: err.response?.data?.message || "Failed to delete product.",
+        message: err.response?.data?.message || "Could not delete product.",
         type: "error",
       });
       setDeletingProduct(null);
     },
   });
 
-  // CSV Import Mutations
-  const previewMutation = useMutation({
-    mutationFn: (file: File) => productApi.importPreview(file),
-    onSuccess: (preview) => {
-      setImportPreviewData(preview);
+  // Import Mutation
+  const importMutation = useMutation({
+    mutationFn: (file: File) => productApi.importCsv(file),
+    onSuccess: (res) => {
+      setImportResult(res);
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["categories-all"] });
+      addToast({
+        title: "Import Completed",
+        message: res.message,
+        type: "success",
+      });
     },
     onError: (err: any) => {
       addToast({
-        title: "Import Preview Failed",
-        message: err.response?.data?.message || "Could not parse CSV file.",
+        title: "Import Failed",
+        message: err.response?.data?.message || "CSV processing failed.",
         type: "error",
       });
     },
   });
 
-  const commitMutation = useMutation({
-    mutationFn: () => {
-      if (!importPreviewData) throw new Error("No preview token");
-      return productApi.importCommit({
-        preview_token: importPreviewData.preview_token,
-        duplicate_sku_action: duplicateAction,
-        create_missing_categories: createMissingCats,
-        create_missing_units: createMissingUnits,
-      });
-    },
+  // Stock Adjustment Mutation
+  const adjustmentMutation = useMutation({
+    mutationFn: (payload: {
+      product_id: number;
+      delta: number;
+      reason: string;
+    }) => adjustmentApi.create(payload),
     onSuccess: (res) => {
-      invalidateProductQueries();
-      queryClient.invalidateQueries({ queryKey: ["categories-all"] });
-      queryClient.invalidateQueries({ queryKey: ["units-all"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["stock-movements"] });
+      queryClient.invalidateQueries({ queryKey: ["product-movements"] });
       addToast({
-        title: "Import Complete",
-        message: `Successfully imported ${res.imported_count} new and updated ${res.updated_count} products (${res.skipped_count} skipped).`,
+        title: "Stock Adjusted",
+        message: res.message || "Product stock updated successfully.",
         type: "success",
       });
-      setIsImportModalOpen(false);
-      setImportFile(null);
-      setImportPreviewData(null);
+      setAdjustingProduct(null);
     },
     onError: (err: any) => {
+      const msg =
+        err.response?.data?.message || "Failed to adjust product stock.";
+      setAdjustmentError(msg);
       addToast({
-        title: "Import Failed",
-        message: err.response?.data?.message || "Failed to commit CSV import.",
+        title: "Adjustment Failed",
+        message: msg,
         type: "error",
       });
     },
   });
+
+  const openCreateModal = () => {
+    setEditingProduct(null);
+    reset({
+      sku: "",
+      name: "",
+      description: "",
+      category_id: "" as any,
+      cost_price: 0,
+      sell_price: 0,
+      stock_qty: 0,
+      reorder_level: 10,
+      is_active: true,
+    });
+    setIsFormModalOpen(true);
+  };
+
+  const openEditModal = (prod: Product) => {
+    setEditingProduct(prod);
+    reset({
+      sku: prod.sku,
+      name: prod.name,
+      description: prod.description || "",
+      category_id: prod.category_id,
+      cost_price: prod.cost_price ? parseFloat(prod.cost_price) : 0,
+      sell_price: parseFloat(prod.sell_price),
+      stock_qty: prod.stock_qty,
+      reorder_level: prod.reorder_level,
+      is_active: prod.is_active,
+    });
+    setIsFormModalOpen(true);
+  };
+
+  const closeFormModal = () => {
+    setIsFormModalOpen(false);
+    setEditingProduct(null);
+    reset();
+  };
+
+  const onFormSubmit = (formData: ProductFormData) => {
+    saveMutation.mutate(formData);
+  };
+
+  const openAdjustmentModal = (prod: Product) => {
+    setAdjustingProduct(prod);
+    setAdjustmentDelta(0);
+    setAdjustmentReason("");
+    setAdjustmentError(null);
+  };
+
+  const currentStock = adjustingProduct?.stock_qty ?? 0;
+  const projectedStock = currentStock + adjustmentDelta;
+  const isProjectedNegative = projectedStock < 0;
+  const isProjectedLow = adjustingProduct
+    ? projectedStock <= adjustingProduct.reorder_level
+    : false;
+
+  const handleAdjustmentSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adjustingProduct) return;
+    if (adjustmentDelta === 0) {
+      setAdjustmentError("Delta quantity must be non-zero.");
+      return;
+    }
+    if (isProjectedNegative) {
+      setAdjustmentError(
+        `Resulting stock cannot be negative. Max reduction is -${currentStock}.`,
+      );
+      return;
+    }
+    if (!adjustmentReason.trim() || adjustmentReason.trim().length < 3) {
+      setAdjustmentError(
+        "A detailed reason is required (minimum 3 characters).",
+      );
+      return;
+    }
+    setAdjustmentError(null);
+    adjustmentMutation.mutate({
+      product_id: adjustingProduct.id,
+      delta: adjustmentDelta,
+      reason: adjustmentReason.trim(),
+    });
+  };
 
   const handleDownloadTemplate = async () => {
     try {
       const blob = await productApi.downloadTemplate();
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "products_import_template.csv";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", "products_import_template.csv");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
     } catch {
       addToast({
         title: "Download Failed",
-        message: "Could not download template CSV.",
+        message: "Unable to download template at this time.",
         type: "error",
       });
     }
   };
 
-  const handleSort = (column: string) => {
-    if (sortBy === column) {
-      updateFilters({
-        sort_order: sortOrder === "asc" ? "desc" : "asc",
-        page: "1",
-      });
-    } else {
-      updateFilters({ sort_by: column, sort_order: "asc", page: "1" });
-    }
+  const handleImportSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!importFile) return;
+    importMutation.mutate(importFile);
   };
+
+  const categoryOptions = (categoriesData?.data || []).map((cat) => ({
+    label: cat.parent ? `${cat.parent.name} > ${cat.name}` : cat.name,
+    value: cat.id,
+  }));
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
+      {/* Top Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-slate-900">Products Catalog</h1>
+          <h2 className="text-xl font-bold text-slate-900 tracking-tight">
+            Products
+          </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Manage product inventory items, SKUs, pricing, stock levels, and
-            WebP product images.
+            Manage product inventory, pricing catalog, and reorder levels
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {canImport && (
+        {canManage && (
+          <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="sm"
               onClick={() => {
                 setImportFile(null);
-                setImportPreviewData(null);
+                setImportResult(null);
                 setIsImportModalOpen(true);
               }}
-              className="gap-1.5"
+              leftIcon={<UploadCloud className="w-4 h-4" />}
             >
-              <FileSpreadsheet className="w-3.5 h-3.5" />
-              <span>Import CSV</span>
+              Import CSV
             </Button>
-          )}
-
-          {canManage && (
             <Button
               variant="primary"
               size="sm"
               onClick={openCreateModal}
-              className="gap-1.5"
+              leftIcon={<Plus className="w-4 h-4" />}
             >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Add Product</span>
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {/* Filter and Search Bar */}
-      <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm space-y-3">
-        <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
-          {/* Search */}
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <Input
-              value={search}
-              onChange={(e) =>
-                updateFilters({ search: e.target.value, page: "1" })
-              }
-              placeholder="Search by SKU, product name, or description..."
-              className="pl-9 text-xs"
-            />
-          </div>
-
-          {/* Filters */}
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Category */}
-            <Select
-              value={categoryFilter}
-              onChange={(e) =>
-                updateFilters({ category_id: e.target.value, page: "1" })
-              }
-              className="text-xs w-40"
-              options={[
-                { label: "All Categories", value: "" },
-                ...allCategories.map((c: any) => ({
-                  label: c.name,
-                  value: String(c.id),
-                })),
-              ]}
-            />
-
-            {/* Unit */}
-            <Select
-              value={unitFilter}
-              onChange={(e) =>
-                updateFilters({ unit_id: e.target.value, page: "1" })
-              }
-              className="text-xs w-32"
-              options={[
-                { label: "All Units", value: "" },
-                ...allUnits.map((u: any) => ({
-                  label: `${u.name} (${u.short_name})`,
-                  value: String(u.id),
-                })),
-              ]}
-            />
-
-            {/* Active Status */}
-            <Select
-              value={statusFilter}
-              onChange={(e) =>
-                updateFilters({ is_active: e.target.value, page: "1" })
-              }
-              className="text-xs w-32"
-              options={[
-                { label: "All Statuses", value: "" },
-                { label: "Active", value: "1" },
-                { label: "Inactive", value: "0" },
-              ]}
-            />
-
-            {/* Low stock toggle */}
-            <button
-              onClick={() =>
-                updateFilters({
-                  low_stock: lowStockFilter ? null : "true",
-                  page: "1",
-                })
-              }
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-semibold transition-colors ${
-                lowStockFilter
-                  ? "border-amber-400 bg-amber-50 text-amber-900 font-bold"
-                  : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-              }`}
-            >
-              <AlertTriangle
-                className={`w-3.5 h-3.5 ${lowStockFilter ? "text-amber-600" : "text-slate-400"}`}
-              />
-              <span>Low Stock Only</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Clear filters shortcut */}
-        {(search ||
-          categoryFilter ||
-          unitFilter ||
-          statusFilter ||
-          lowStockFilter) && (
-          <div className="flex items-center justify-between text-xs text-slate-500 pt-1 border-t border-slate-100">
-            <span>Filtered results</span>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() =>
-                updateFilters({
-                  search: null,
-                  category_id: null,
-                  unit_id: null,
-                  is_active: null,
-                  low_stock: null,
-                  page: "1",
-                })
-              }
-              className="text-xs text-slate-600"
-            >
-              Reset all filters
+              Add Product
             </Button>
           </div>
         )}
       </div>
 
-      {/* Table */}
-      <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
-        {isLoading ? (
-          <div className="p-4">
-            <TableSkeleton rows={8} columns={7} />
-          </div>
-        ) : products.length === 0 ? (
-          <EmptyState
-            icon={<Package className="w-8 h-8 text-slate-500" />}
-            title="No products found"
-            description={
-              search ||
-              categoryFilter ||
-              unitFilter ||
-              statusFilter ||
-              lowStockFilter
-                ? "No inventory items match the current filter selection."
-                : "Get started by creating your first product or importing a CSV catalog."
+      {/* Filter / Search Bar */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 bg-white p-3 rounded-lg border border-slate-200">
+        {/* Search */}
+        <div className="relative">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            placeholder="Search by SKU or name..."
+            value={filters.search}
+            onChange={(e) =>
+              setFilters((prev) => ({
+                ...prev,
+                search: e.target.value,
+                page: 1,
+              }))
             }
-            actionLabel={canManage ? "Create Product" : undefined}
-            onAction={canManage ? openCreateModal : undefined}
+            className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[#4338CA] focus:bg-white"
           />
+        </div>
+
+        {/* Category filter */}
+        <select
+          value={filters.category_id}
+          onChange={(e) =>
+            setFilters((prev) => ({
+              ...prev,
+              category_id: e.target.value ? Number(e.target.value) : "",
+              page: 1,
+            }))
+          }
+          className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#4338CA] focus:bg-white"
+        >
+          <option value="">All Categories</option>
+          {categoryOptions.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+
+        {/* Status filter */}
+        <select
+          value={filters.is_active === "" ? "" : filters.is_active ? "1" : "0"}
+          onChange={(e) =>
+            setFilters((prev) => ({
+              ...prev,
+              is_active: e.target.value === "" ? "" : e.target.value === "1",
+              page: 1,
+            }))
+          }
+          className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#4338CA] focus:bg-white"
+        >
+          <option value="">All Statuses</option>
+          <option value="1">Active Only</option>
+          <option value="0">Inactive Only</option>
+        </select>
+
+        {/* Low Stock Toggle button (uses Accent Amber for warning indicator) */}
+        <button
+          type="button"
+          onClick={() =>
+            setFilters((prev) => ({
+              ...prev,
+              low_stock: !prev.low_stock,
+              page: 1,
+            }))
+          }
+          className={`flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+            filters.low_stock
+              ? "bg-[#FEF3C7] border-amber-400 text-amber-900"
+              : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
+          }`}
+        >
+          <AlertTriangle
+            className={`w-3.5 h-3.5 ${filters.low_stock ? "text-[#F59E0B]" : "text-slate-400"}`}
+          />
+          <span>Low Stock Only</span>
+        </button>
+      </div>
+
+      {/* Table Content */}
+      <div className="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-none">
+        {isLoading ? (
+          <TableSkeleton rows={8} columns={canManage ? 9 : 7} />
+        ) : products.length === 0 ? (
+          <div className="p-8">
+            <EmptyState
+              title="No products found"
+              description={
+                filters.search || filters.category_id || filters.low_stock
+                  ? "No products matched your active filters."
+                  : "Start expanding your inventory catalog by adding your first product."
+              }
+              actionLabel={
+                canManage && !filters.search ? "Add Product" : undefined
+              }
+              onAction={openCreateModal}
+            />
+          </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold uppercase tracking-wider text-[11px]">
+            <table className="w-full text-left text-xs text-slate-700">
+              <thead className="bg-slate-50/75 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-semibold text-[11px]">
                 <tr>
-                  <th className="py-3 px-4 w-12">Image</th>
-                  <th
-                    onClick={() => handleSort("sku")}
-                    className="py-3 px-4 cursor-pointer hover:text-slate-900 transition-colors"
-                  >
-                    <div className="flex items-center gap-1">
-                      <span>SKU</span>
-                      <ArrowUpDown className="w-3 h-3 text-slate-400" />
-                    </div>
-                  </th>
-                  <th
-                    onClick={() => handleSort("name")}
-                    className="py-3 px-4 cursor-pointer hover:text-slate-900 transition-colors"
-                  >
-                    <div className="flex items-center gap-1">
-                      <span>Product Name</span>
-                      <ArrowUpDown className="w-3 h-3 text-slate-400" />
-                    </div>
-                  </th>
+                  <th className="py-3 px-4">SKU</th>
+                  <th className="py-3 px-4">Product Name</th>
                   <th className="py-3 px-4">Category</th>
-                  <th className="py-3 px-4">Unit</th>
-                  {canViewCost && (
+                  {canManage && (
                     <th className="py-3 px-4 text-right">Cost Price</th>
                   )}
-                  <th
-                    onClick={() => handleSort("sell_price")}
-                    className="py-3 px-4 text-right cursor-pointer hover:text-slate-900 transition-colors"
-                  >
-                    <div className="flex items-center justify-end gap-1">
-                      <span>Sell Price</span>
-                      <ArrowUpDown className="w-3 h-3 text-slate-400" />
-                    </div>
-                  </th>
-                  <th
-                    onClick={() => handleSort("stock_qty")}
-                    className="py-3 px-4 text-right cursor-pointer hover:text-slate-900 transition-colors"
-                  >
-                    <div className="flex items-center justify-end gap-1">
-                      <span>Stock Qty</span>
-                      <ArrowUpDown className="w-3 h-3 text-slate-400" />
-                    </div>
-                  </th>
+                  {canManage && (
+                    <th className="py-3 px-4 text-right">Avg Cost</th>
+                  )}
+                  <th className="py-3 px-4 text-right">Sell Price</th>
+                  <th className="py-3 px-4 text-center">Stock Level</th>
                   <th className="py-3 px-4 text-center">Status</th>
                   <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
-                {products.map((p) => {
-                  const isLow =
-                    p.is_low_stock || p.stock_qty <= p.reorder_level;
-
+              <tbody className="divide-y divide-slate-200">
+                {products.map((prod) => {
+                  const isLow = prod.is_low_stock;
                   return (
                     <tr
-                      key={p.id}
-                      className="hover:bg-slate-50/70 transition-colors"
+                      key={prod.id}
+                      className={`hover:bg-slate-50/60 transition-colors ${
+                        isLow ? "bg-amber-50/30" : ""
+                      }`}
                     >
-                      {/* 40x40 lazy thumbnail */}
-                      <td className="py-2.5 px-4">
-                        <div
-                          onClick={() => setDetailProduct(p)}
-                          className="w-10 h-10 rounded-lg border border-slate-200 overflow-hidden bg-slate-50 flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity"
-                        >
-                          {p.thumb_url ? (
-                            <img
-                              src={p.thumb_url}
-                              alt={p.name}
-                              loading="lazy"
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <Package className="w-5 h-5 text-slate-300" />
-                          )}
-                        </div>
+                      <td className="py-3 px-4 font-mono font-semibold text-slate-900">
+                        {prod.sku}
                       </td>
-
-                      {/* SKU */}
-                      <td className="py-2.5 px-4 font-mono font-bold text-slate-700">
-                        {p.sku}
+                      <td className="py-3 px-4 font-medium text-slate-900 max-w-xs truncate">
+                        {prod.name}
                       </td>
-
-                      {/* Name */}
-                      <td className="py-2.5 px-4">
-                        <div
-                          onClick={() => setDetailProduct(p)}
-                          className="font-semibold text-slate-900 hover:text-indigo-700 cursor-pointer truncate max-w-[220px]"
-                          title={p.name}
-                        >
-                          {p.name}
-                        </div>
-                        {p.description && (
-                          <div className="text-[11px] text-slate-500 truncate max-w-[220px]">
-                            {p.description}
-                          </div>
-                        )}
+                      <td className="py-3 px-4 text-slate-600">
+                        {prod.category?.name || "—"}
                       </td>
-
-                      {/* Category */}
-                      <td className="py-2.5 px-4">
-                        <span className="bg-slate-100 text-slate-700 font-medium px-2 py-0.5 rounded text-[11px] border border-slate-200">
-                          {p.category?.name || "-"}
-                        </span>
-                      </td>
-
-                      {/* Unit */}
-                      <td className="py-2.5 px-4 text-slate-600 font-mono text-[11px]">
-                        {p.unit?.short_name || "-"}
-                      </td>
-
-                      {/* Cost price (if authorized) */}
-                      {canViewCost && (
-                        <td className="py-2.5 px-4 text-right text-slate-500 font-mono">
-                          {p.cost_price ? formatMoney(p.cost_price) : "-"}
+                      {canManage && (
+                        <td className="py-3 px-4 text-right font-mono text-slate-600">
+                          ${prod.cost_price ?? "—"}
                         </td>
                       )}
-
-                      {/* Sell price */}
-                      <td className="py-2.5 px-4 text-right font-bold text-slate-900 font-mono">
-                        {formatMoney(p.sell_price)}
+                      {canManage && (
+                        <td className="py-3 px-4 text-right font-mono text-slate-600">
+                          ${prod.avg_cost ?? prod.cost_price ?? "—"}
+                        </td>
+                      )}
+                      <td className="py-3 px-4 text-right font-mono font-semibold text-slate-900">
+                        ${prod.sell_price}
                       </td>
-
-                      {/* Stock qty */}
-                      <td className="py-2.5 px-4 text-right">
+                      <td className="py-3 px-4 text-center">
                         {isLow ? (
-                          <span className="inline-flex items-center gap-1 font-bold text-amber-900 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-300 text-[11px]">
+                          <Badge variant="warning" size="sm">
                             <AlertTriangle className="w-3 h-3 text-amber-600" />
-                            <span>{p.stock_qty}</span>
-                          </span>
+                            <span>
+                              {prod.stock_qty} (Min: {prod.reorder_level})
+                            </span>
+                          </Badge>
                         ) : (
-                          <span className="font-semibold text-slate-800">
-                            {p.stock_qty}
+                          <span className="font-semibold text-slate-900 font-mono">
+                            {prod.stock_qty}
                           </span>
                         )}
                       </td>
-
-                      {/* Active toggle */}
-                      <td className="py-2.5 px-4 text-center">
-                        {canManage ? (
-                          <button
-                            onClick={() => toggleActiveMutation.mutate(p.id)}
-                            className="p-1 rounded text-slate-600 hover:text-slate-900 transition-colors"
-                            title={
-                              p.is_active
-                                ? "Click to deactivate"
-                                : "Click to activate"
-                            }
-                          >
-                            {p.is_active ? (
-                              <ToggleRight className="w-5 h-5 text-indigo-700" />
-                            ) : (
-                              <ToggleLeft className="w-5 h-5 text-slate-400" />
-                            )}
-                          </button>
-                        ) : (
-                          <span className="text-[11px] font-medium text-slate-500">
-                            {p.is_active ? "Active" : "Inactive"}
-                          </span>
-                        )}
+                      <td className="py-3 px-4 text-center">
+                        <Badge
+                          variant={prod.is_active ? "neutral" : "outline"}
+                          size="sm"
+                          className={
+                            prod.is_active ? "font-semibold" : "text-slate-400"
+                          }
+                        >
+                          {prod.is_active ? "Active" : "Inactive"}
+                        </Badge>
                       </td>
-
-                      {/* Actions */}
-                      <td className="py-2.5 px-4 text-right">
+                      <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <button
-                            onClick={() => setDetailProduct(p)}
-                            className="p-1.5 rounded text-slate-500 hover:text-indigo-700 hover:bg-slate-100 transition-colors"
-                            title="View Details"
+                            onClick={() => {
+                              setDetailProduct(prod);
+                              setDetailTab("details");
+                            }}
+                            className="p-1.5 text-slate-500 hover:text-slate-900 rounded hover:bg-slate-100 transition-colors"
+                            title="View Details & Stock History"
                           >
                             <Eye className="w-3.5 h-3.5" />
                           </button>
                           {canManage && (
                             <>
                               <button
-                                onClick={() => openEditModal(p)}
-                                className="p-1.5 rounded text-slate-500 hover:text-indigo-700 hover:bg-slate-100 transition-colors"
+                                onClick={() => openAdjustmentModal(prod)}
+                                className="p-1.5 text-slate-500 hover:text-slate-900 rounded hover:bg-slate-100 transition-colors"
+                                title="Stock Adjustment"
+                              >
+                                <SlidersHorizontal className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => openEditModal(prod)}
+                                className="p-1.5 text-slate-500 hover:text-slate-900 rounded hover:bg-slate-100 transition-colors"
                                 title="Edit Product"
                               >
                                 <Edit2 className="w-3.5 h-3.5" />
                               </button>
                               <button
-                                onClick={() => setDeletingProduct(p)}
-                                className="p-1.5 rounded text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+                                onClick={() => setDeletingProduct(prod)}
+                                className="p-1.5 text-slate-500 hover:text-slate-900 rounded hover:bg-slate-100 transition-colors"
                                 title="Delete Product"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
@@ -773,705 +605,700 @@ export const Products: React.FC = () => {
           </div>
         )}
 
-        {/* Pagination */}
+        {/* Pagination Footer */}
         {meta && meta.last_page > 1 && (
-          <div className="p-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-xs text-slate-600">
+          <div className="border-t border-slate-200 px-4 py-3 flex items-center justify-between bg-slate-50 text-xs text-slate-600">
             <div>
-              Showing{" "}
-              <span className="font-semibold text-slate-900">{meta.from}</span>{" "}
-              to <span className="font-semibold text-slate-900">{meta.to}</span>{" "}
-              of{" "}
-              <span className="font-semibold text-slate-900">{meta.total}</span>{" "}
-              products
+              Showing <span className="font-semibold">{meta.from || 0}</span> to{" "}
+              <span className="font-semibold">{meta.to || 0}</span> of{" "}
+              <span className="font-semibold">{meta.total}</span> products
             </div>
             <div className="flex items-center gap-1">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page <= 1}
-                onClick={() => updateFilters({ page: (page - 1).toString() })}
-                className="p-1.5"
-                title="Previous page"
+              <button
+                disabled={meta.current_page <= 1}
+                onClick={() =>
+                  setFilters((prev) => ({
+                    ...prev,
+                    page: (prev.page || 1) - 1,
+                  }))
+                }
+                className="p-1.5 rounded border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                aria-label="Previous page"
               >
-                <ChevronLeft className="w-3.5 h-3.5" />
-              </Button>
+                <ChevronLeft className="w-4 h-4" />
+              </button>
               <span className="px-2 font-medium">
                 Page {meta.current_page} of {meta.last_page}
               </span>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page >= meta.last_page}
-                onClick={() => updateFilters({ page: (page + 1).toString() })}
-                className="p-1.5"
-                title="Next page"
+              <button
+                disabled={meta.current_page >= meta.last_page}
+                onClick={() =>
+                  setFilters((prev) => ({
+                    ...prev,
+                    page: (prev.page || 1) + 1,
+                  }))
+                }
+                className="p-1.5 rounded border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                aria-label="Next page"
               >
-                <ChevronRight className="w-3.5 h-3.5" />
-              </Button>
+                <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
           </div>
         )}
       </div>
 
-      {/* Product Detail Modal */}
-      <Modal
-        isOpen={!!detailProduct}
-        onClose={() => setDetailProduct(null)}
-        title="Product Details"
-        maxWidth="lg"
-      >
-        {detailProduct && (
-          <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row gap-6 items-start">
-              {/* Large Image Preview */}
-              <div className="w-full sm:w-48 h-48 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden shrink-0">
-                {detailProduct.image_url ? (
-                  <img
-                    src={detailProduct.image_url}
-                    alt={detailProduct.name}
-                    className="w-full h-full object-contain"
-                  />
-                ) : (
-                  <div className="flex flex-col items-center text-slate-400">
-                    <Package className="w-12 h-12 stroke-[1.5]" />
-                    <span className="text-[11px] mt-1">No image attached</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Information */}
-              <div className="flex-1 space-y-3 min-w-0">
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-mono text-xs font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-                      {detailProduct.sku}
-                    </span>
-                    <Badge
-                      variant={detailProduct.is_active ? "primary" : "neutral"}
-                      size="sm"
-                    >
-                      {detailProduct.is_active ? "Active" : "Inactive"}
-                    </Badge>
-                    {detailProduct.is_low_stock && (
-                      <Badge variant="warning" size="sm">
-                        Low Stock
-                      </Badge>
-                    )}
-                  </div>
-                  <h2 className="text-base font-bold text-slate-900">
-                    {detailProduct.name}
-                  </h2>
-                  <p className="text-xs text-slate-500 mt-1">
-                    {detailProduct.description || "No description provided."}
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100 text-xs">
-                  <div>
-                    <span className="text-slate-500 block text-[11px]">
-                      Category
-                    </span>
-                    <span className="font-semibold text-slate-900">
-                      {detailProduct.category?.name || "-"}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 block text-[11px]">
-                      Unit of Measure
-                    </span>
-                    <span className="font-semibold text-slate-900">
-                      {detailProduct.unit?.name} (
-                      {detailProduct.unit?.short_name})
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 block text-[11px]">
-                      Sell Price
-                    </span>
-                    <span className="font-bold text-slate-900 font-mono">
-                      {formatMoney(detailProduct.sell_price)}
-                    </span>
-                  </div>
-                  {canViewCost && (
-                    <div>
-                      <span className="text-slate-500 block text-[11px]">
-                        Cost Price
-                      </span>
-                      <span className="font-medium text-slate-600 font-mono">
-                        {detailProduct.cost_price
-                          ? formatMoney(detailProduct.cost_price)
-                          : "-"}
-                      </span>
-                    </div>
-                  )}
-                  <div>
-                    <span className="text-slate-500 block text-[11px]">
-                      Current Stock
-                    </span>
-                    <span
-                      className={`font-bold ${
-                        detailProduct.is_low_stock
-                          ? "text-amber-900"
-                          : "text-slate-900"
-                      }`}
-                    >
-                      {detailProduct.stock_qty} {detailProduct.unit?.short_name}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 block text-[11px]">
-                      Reorder Threshold
-                    </span>
-                    <span className="font-medium text-slate-700">
-                      {detailProduct.reorder_level}{" "}
-                      {detailProduct.unit?.short_name}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-end pt-3 border-t border-slate-100">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setDetailProduct(null)}
-              >
-                Close
-              </Button>
-            </div>
-          </div>
-        )}
-      </Modal>
-
-      {/* Create / Edit Drawer Modal */}
+      {/* Add / Edit Product Modal */}
       <Modal
         isOpen={isFormModalOpen}
         onClose={closeFormModal}
-        title={
-          editingProduct
-            ? `Edit Product: ${editingProduct.sku}`
-            : "Create New Product"
-        }
+        title={editingProduct ? "Edit Product" : "Add New Product"}
+        description="Configure item details, cost, retail pricing, and reorder levels."
         maxWidth="lg"
+        footer={
+          <>
+            <Button variant="outline" size="sm" onClick={closeFormModal}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleSubmit(onFormSubmit)}
+              isLoading={saveMutation.isPending}
+            >
+              {editingProduct ? "Update Product" : "Create Product"}
+            </Button>
+          </>
+        }
       >
-        <form
-          onSubmit={handleSubmit((d) => saveMutation.mutate(d))}
-          className="space-y-4"
-        >
-          {/* Image Uploader */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Product Image
-            </label>
-            <ImageUploader
-              currentImageUrl={editingProduct?.image_url}
-              onFileSelect={(file) => {
-                setSelectedImageFile(file);
-                setRemoveExistingImage(false);
-              }}
-              onRemoveExisting={() => {
-                setSelectedImageFile(null);
-                setRemoveExistingImage(true);
-              }}
+        <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input
+              label="SKU / Barcode"
+              placeholder="e.g. LAP-APP-MBP14"
+              required
+              error={errors.sku?.message}
+              {...register("sku")}
+            />
+
+            <Select
+              label="Category"
+              placeholder="Select Category"
+              required
+              options={categoryOptions}
+              error={errors.category_id?.message}
+              {...register("category_id", { valueAsNumber: true })}
+            />
+          </div>
+
+          <Input
+            label="Product Name"
+            placeholder="e.g. MacBook Pro 14 M3 Pro 18GB"
+            required
+            error={errors.name?.message}
+            {...register("name")}
+          />
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input
+              label="Cost Price ($)"
+              type="number"
+              step="0.01"
+              placeholder="0.00"
+              required
+              error={errors.cost_price?.message}
+              {...register("cost_price", { valueAsNumber: true })}
+            />
+
+            <Input
+              label="Retail Sell Price ($)"
+              type="number"
+              step="0.01"
+              placeholder="0.00"
+              required
+              error={errors.sell_price?.message}
+              {...register("sell_price", { valueAsNumber: true })}
             />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                SKU (Stock Keeping Unit) *
-              </label>
               <Input
-                {...register("sku")}
-                placeholder="e.g. LAP-001"
-                error={errors.sku?.message}
-                disabled={!!editingProduct}
+                label={
+                  editingProduct
+                    ? "Current Stock Qty (Read Only)"
+                    : "Initial Stock Qty"
+                }
+                type="number"
+                placeholder="0"
+                disabled={Boolean(editingProduct)}
+                helperText={
+                  editingProduct
+                    ? "To change stock, use the Stock Adjustment action or Purchase Receiving."
+                    : undefined
+                }
+                error={errors.stock_qty?.message}
+                {...register("stock_qty", { valueAsNumber: true })}
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Product Name *
-              </label>
-              <Input
-                {...register("name")}
-                placeholder="e.g. Ultra Slim Laptop 14"
-                error={errors.name?.message}
-              />
-            </div>
+            <Input
+              label="Reorder Alert Level"
+              type="number"
+              placeholder="10"
+              helperText="Alerts when stock drops at or below this amount."
+              error={errors.reorder_level?.message}
+              {...register("reorder_level", { valueAsNumber: true })}
+            />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">
               Description
             </label>
             <textarea
+              rows={3}
+              placeholder="Detailed specifications or notes..."
+              className="w-full px-3 py-2 text-sm bg-white text-slate-900 border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#4338CA] focus:border-[#4338CA]"
               {...register("description")}
-              rows={2}
-              placeholder="Product specifications and details..."
-              className="w-full text-xs rounded-lg border border-slate-300 p-2 focus:ring-1 focus:ring-[#4338CA] focus:border-[#4338CA] outline-none"
             />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Category *
-              </label>
-              <Select
-                {...register("category_id", { valueAsNumber: true })}
-                error={errors.category_id?.message}
-                options={allCategories.map((c: any) => ({
-                  label: c.name,
-                  value: String(c.id),
-                }))}
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Unit of Measure
-              </label>
-              <Select
-                {...register("unit_id", {
-                  setValueAs: (v) =>
-                    v === "" || v === null ? null : Number(v),
-                })}
-                error={errors.unit_id?.message}
-                options={[
-                  { label: "(None / Not specified)", value: "" },
-                  ...allUnits.map((u: any) => ({
-                    label: `${u.name} (${u.short_name})`,
-                    value: String(u.id),
-                  })),
-                ]}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {canViewCost && (
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Cost Price ({settings?.currency_symbol}) *
-                </label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  {...register("cost_price", { valueAsNumber: true })}
-                  placeholder="0.00"
-                  error={errors.cost_price?.message}
-                />
-              </div>
-            )}
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Selling Price ({settings?.currency_symbol}) *
-              </label>
-              <Input
-                type="number"
-                step="0.01"
-                {...register("sell_price", { valueAsNumber: true })}
-                placeholder="0.00"
-                error={errors.sell_price?.message}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Initial Stock Quantity *
-              </label>
-              <Input
-                type="number"
-                {...register("stock_qty", { valueAsNumber: true })}
-                disabled={!!editingProduct}
-                error={errors.stock_qty?.message}
-              />
-              {editingProduct && (
-                <p className="text-[10px] text-slate-400 mt-1">
-                  Stock adjustments are audited in movements log.
-                </p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Reorder Warning Threshold *
-              </label>
-              <Input
-                type="number"
-                {...register("reorder_level", { valueAsNumber: true })}
-                placeholder="10"
-                error={errors.reorder_level?.message}
-              />
-            </div>
           </div>
 
           <div className="flex items-center gap-2 pt-1">
             <input
               type="checkbox"
-              id="product_is_active"
-              {...register("is_active")}
+              id="is_active"
               className="rounded border-slate-300 text-[#4338CA] focus:ring-[#4338CA]"
+              {...register("is_active")}
             />
             <label
-              htmlFor="product_is_active"
-              className="text-xs font-medium text-slate-700"
+              htmlFor="is_active"
+              className="text-xs font-semibold text-slate-800"
             >
-              Product is active and visible for sales
+              Active in POS and Sales catalog
             </label>
-          </div>
-
-          <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={closeFormModal}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              variant="primary"
-              size="sm"
-              disabled={isSubmitting || saveMutation.isPending}
-            >
-              {saveMutation.isPending
-                ? "Saving..."
-                : editingProduct
-                  ? "Save Changes"
-                  : "Create Product"}
-            </Button>
           </div>
         </form>
       </Modal>
 
-      {/* CSV Import Wizard Modal (Two-step) */}
+      {/* Stock Adjustment Modal */}
       <Modal
-        isOpen={isImportModalOpen}
-        onClose={() => {
-          setIsImportModalOpen(false);
-          setImportFile(null);
-          setImportPreviewData(null);
-        }}
-        title="Import Products from CSV"
-        maxWidth="lg"
+        isOpen={Boolean(adjustingProduct)}
+        onClose={() => setAdjustingProduct(null)}
+        title="Manual Stock Adjustment"
+        description="Write an immutable audit movement to correct stock quantities."
+        maxWidth="md"
+        footer={
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setAdjustingProduct(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleAdjustmentSubmit}
+              disabled={
+                adjustmentDelta === 0 ||
+                isProjectedNegative ||
+                !adjustmentReason.trim()
+              }
+              isLoading={adjustmentMutation.isPending}
+            >
+              Apply Adjustment
+            </Button>
+          </>
+        }
       >
-        <div className="space-y-4">
-          {!importPreviewData ? (
-            /* Step 1: Upload and Preview */
-            <div className="space-y-4">
-              <div className="flex items-center justify-between text-xs text-slate-600 bg-slate-50 p-3 rounded-lg border border-slate-200">
+        {adjustingProduct && (
+          <form
+            onSubmit={handleAdjustmentSubmit}
+            className="space-y-4 text-xs text-slate-700"
+          >
+            {/* Product Summary Box */}
+            <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+              <div className="font-semibold text-slate-900 text-sm">
+                {adjustingProduct.name}
+              </div>
+              <div className="font-mono text-slate-500 mt-0.5">
+                SKU: {adjustingProduct.sku}
+              </div>
+              <div className="grid grid-cols-2 gap-4 mt-2 pt-2 border-t border-slate-200 text-slate-600">
                 <div>
-                  <p className="font-semibold text-slate-800">
-                    Need the CSV template?
-                  </p>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    Download the pre-formatted structure with example column
-                    headers.
-                  </p>
+                  Current Stock:{" "}
+                  <span className="font-mono font-bold text-slate-900">
+                    {adjustingProduct.stock_qty}
+                  </span>
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleDownloadTemplate}
-                  className="gap-1.5 shrink-0"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Download Template</span>
-                </Button>
-              </div>
-
-              {/* Drop area */}
-              <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center bg-white">
-                <FileSpreadsheet className="w-10 h-10 text-slate-400 mx-auto mb-2" />
-                <p className="text-xs font-semibold text-slate-800">
-                  Select a CSV file to validate and preview
-                </p>
-                <p className="text-[11px] text-slate-500 mt-0.5 mb-3">
-                  Required columns: sku, name, category, cost_price, sell_price,
-                  stock_qty, reorder_level
-                </p>
-                <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#4338CA] bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors">
-                  <UploadCloud className="w-4 h-4" />
-                  <span>Browse CSV File</span>
-                  <input
-                    type="file"
-                    accept=".csv,text/csv"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        setImportFile(e.target.files[0]);
-                      }
-                    }}
-                    className="hidden"
-                  />
-                </label>
-                {importFile && (
-                  <p className="text-xs font-bold text-slate-900 mt-3">
-                    Selected: {importFile.name} (
-                    {(importFile.size / 1024).toFixed(1)} KB)
-                  </p>
-                )}
-              </div>
-
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsImportModalOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  disabled={!importFile || previewMutation.isPending}
-                  onClick={() =>
-                    importFile && previewMutation.mutate(importFile)
-                  }
-                >
-                  {previewMutation.isPending
-                    ? "Validating CSV..."
-                    : "Validate & Preview"}
-                </Button>
+                <div>
+                  Reorder Level:{" "}
+                  <span className="font-mono font-medium text-slate-900">
+                    {adjustingProduct.reorder_level}
+                  </span>
+                </div>
               </div>
             </div>
-          ) : (
-            /* Step 2: Confirm Options & Review */
-            <div className="space-y-4">
-              {/* Summary Badges */}
-              <div className="grid grid-cols-3 gap-3">
-                <div className="p-3 rounded-lg border border-slate-200 bg-slate-50 text-center">
-                  <span className="text-[11px] text-slate-500 block font-semibold">
-                    Total Rows
-                  </span>
-                  <span className="text-lg font-bold text-slate-900">
-                    {importPreviewData.total_rows}
-                  </span>
-                </div>
-                <div className="p-3 rounded-lg border border-slate-200 bg-slate-50 text-center">
-                  <span className="text-[11px] text-slate-500 block font-semibold">
-                    Valid Rows
-                  </span>
-                  <span className="text-lg font-bold text-slate-900">
-                    {importPreviewData.valid_rows_count}
-                  </span>
-                </div>
-                <div className="p-3 rounded-lg border border-slate-200 bg-slate-50 text-center">
-                  <span className="text-[11px] text-slate-500 block font-semibold">
-                    Errors Found
-                  </span>
-                  <span
-                    className={`text-lg font-bold ${importPreviewData.error_count > 0 ? "text-amber-600" : "text-slate-900"}`}
-                  >
-                    {importPreviewData.error_count}
-                  </span>
-                </div>
-              </div>
 
-              {/* Error report table if any */}
-              {importPreviewData.error_count > 0 && (
-                <div className="border border-amber-300 bg-amber-50 rounded-lg p-3 space-y-2">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-amber-900">
-                    <AlertTriangle className="w-4 h-4 text-amber-600" />
-                    <span>
-                      Errors detected ({importPreviewData.error_count} rows will
-                      be skipped):
+            {/* Delta Input */}
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">
+                Adjustment Quantity Change (Delta){" "}
+                <span className="text-[#4338CA]">*</span>
+              </label>
+              <input
+                type="number"
+                step="1"
+                value={adjustmentDelta === 0 ? "" : adjustmentDelta}
+                onChange={(e) =>
+                  setAdjustmentDelta(
+                    e.target.value === ""
+                      ? 0
+                      : parseInt(e.target.value, 10) || 0,
+                  )
+                }
+                placeholder="e.g. +5 or -3"
+                className="w-full px-3 py-2 text-sm bg-white text-slate-900 border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#4338CA] font-mono"
+                required
+              />
+              <p className="text-[11px] text-slate-500 mt-1">
+                Enter a positive integer to increment stock, or a negative
+                integer to write off inventory.
+              </p>
+            </div>
+
+            {/* Projected Stock Preview */}
+            <div className="p-3 bg-white rounded-lg border border-slate-200 flex items-center justify-between">
+              <div>
+                <span className="text-slate-500 block text-[11px]">
+                  Resulting Stock Quantity
+                </span>
+                <span className="font-bold text-base text-slate-900 font-mono">
+                  {projectedStock} units
+                </span>
+              </div>
+              <div className="text-right">
+                <span className="text-slate-500 block text-[11px]">
+                  Net Change
+                </span>
+                <span className="font-mono font-semibold text-slate-900">
+                  {adjustmentDelta > 0
+                    ? `+${adjustmentDelta}`
+                    : adjustmentDelta}
+                </span>
+              </div>
+            </div>
+
+            {/* Warning or Error messages */}
+            {isProjectedNegative && (
+              <div className="p-2.5 bg-slate-100 border border-slate-300 rounded-lg text-slate-800 font-medium text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-slate-700" />
+                <span>
+                  Cannot adjust stock below 0. Maximum reduction is -
+                  {currentStock}.
+                </span>
+              </div>
+            )}
+
+            {!isProjectedNegative && isProjectedLow && (
+              <div className="p-2.5 bg-[#FEF3C7] border border-amber-300 rounded-lg text-amber-900 font-medium text-xs flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0 text-[#F59E0B]" />
+                <span>
+                  Warning: Resulting stock ({projectedStock}) will reach or fall
+                  below reorder alert level ({adjustingProduct.reorder_level}).
+                </span>
+              </div>
+            )}
+
+            {/* Adjustment Reason */}
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">
+                Adjustment Reason <span className="text-[#4338CA]">*</span>
+              </label>
+              <textarea
+                rows={3}
+                value={adjustmentReason}
+                onChange={(e) => setAdjustmentReason(e.target.value)}
+                placeholder="Explain the reason for this inventory correction (e.g. annual cycle count discrepancy, broken shipment, damaged goods write-off)..."
+                className="w-full px-3 py-2 text-xs bg-white text-slate-900 border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#4338CA]"
+                required
+              />
+            </div>
+
+            {adjustmentError && (
+              <div className="p-2 bg-slate-100 border border-slate-300 rounded text-slate-800 text-xs">
+                {adjustmentError}
+              </div>
+            )}
+          </form>
+        )}
+      </Modal>
+
+      {/* Product Detail & Stock History Modal */}
+      <Modal
+        isOpen={Boolean(detailProduct)}
+        onClose={() => setDetailProduct(null)}
+        title={detailProduct?.name || "Product Details"}
+        description={`SKU: ${detailProduct?.sku || ""} • ${detailProduct?.category?.name || "Uncategorized"}`}
+        maxWidth="2xl"
+        footer={
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setDetailProduct(null)}
+          >
+            Close
+          </Button>
+        }
+      >
+        {detailProduct && (
+          <div className="space-y-4">
+            {/* Tabs */}
+            <div className="flex border-b border-slate-200">
+              <button
+                onClick={() => setDetailTab("details")}
+                className={`px-4 py-2 text-xs font-semibold border-b-2 transition-colors ${
+                  detailTab === "details"
+                    ? "border-[#4338CA] text-[#4338CA]"
+                    : "border-transparent text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                Overview & Specifications
+              </button>
+              <button
+                onClick={() => setDetailTab("history")}
+                className={`px-4 py-2 text-xs font-semibold border-b-2 transition-colors flex items-center gap-1.5 ${
+                  detailTab === "history"
+                    ? "border-[#4338CA] text-[#4338CA]"
+                    : "border-transparent text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                <ArrowLeftRight className="w-3.5 h-3.5" />
+                <span>Stock History</span>
+              </button>
+            </div>
+
+            {/* Tab 1: Details */}
+            {detailTab === "details" && (
+              <div className="space-y-4 text-xs text-slate-700">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                    <span className="text-[11px] text-slate-500 block">
+                      Retail Sell Price
+                    </span>
+                    <span className="text-base font-bold text-slate-900 font-mono">
+                      ${detailProduct.sell_price}
                     </span>
                   </div>
-                  <div className="max-h-36 overflow-y-auto text-xs divide-y divide-amber-200/60">
-                    {importPreviewData.errors.map((err, i) => (
-                      <div
-                        key={i}
-                        className="py-1 text-slate-700 flex items-center justify-between"
-                      >
-                        <span>
-                          <strong className="font-semibold text-slate-900">
-                            Row {err.row}
-                          </strong>
-                          {err.sku ? ` (SKU: ${err.sku})` : ""}: {err.message}
+                  {canManage && (
+                    <>
+                      <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                        <span className="text-[11px] text-slate-500 block">
+                          Cost Price
+                        </span>
+                        <span className="text-base font-bold text-slate-700 font-mono">
+                          ${detailProduct.cost_price ?? "—"}
                         </span>
                       </div>
-                    ))}
+                      <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                        <span className="text-[11px] text-slate-500 block">
+                          Average Unit Cost
+                        </span>
+                        <span className="text-base font-bold text-slate-700 font-mono">
+                          $
+                          {detailProduct.avg_cost ??
+                            detailProduct.cost_price ??
+                            "—"}
+                        </span>
+                      </div>
+                    </>
+                  )}
+                  <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                    <span className="text-[11px] text-slate-500 block">
+                      Current Stock
+                    </span>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-base font-bold text-slate-900 font-mono">
+                        {detailProduct.stock_qty}
+                      </span>
+                      {detailProduct.is_low_stock && (
+                        <Badge variant="warning" size="sm">
+                          Low Stock
+                        </Badge>
+                      )}
+                    </div>
                   </div>
-                </div>
-              )}
-
-              {/* Detected new relations */}
-              {(importPreviewData.new_categories.length > 0 ||
-                importPreviewData.new_units.length > 0) && (
-                <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs space-y-2">
-                  <span className="font-semibold text-slate-900 block">
-                    Detected New Catalog Entities:
-                  </span>
-                  {importPreviewData.new_categories.length > 0 && (
-                    <div>
-                      <span className="text-slate-500">New Categories: </span>
-                      <span className="font-medium text-slate-800">
-                        {importPreviewData.new_categories.join(", ")}
-                      </span>
-                    </div>
-                  )}
-                  {importPreviewData.new_units.length > 0 && (
-                    <div>
-                      <span className="text-slate-500">New Units: </span>
-                      <span className="font-medium text-slate-800">
-                        {importPreviewData.new_units.join(", ")}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Options */}
-              <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-3 text-xs">
-                <span className="font-bold text-slate-900 block">
-                  Import Configuration:
-                </span>
-
-                <div>
-                  <span className="font-semibold text-slate-700 block mb-1">
-                    When SKU already exists in database (
-                    {importPreviewData.duplicate_skus.length} matches):
-                  </span>
-                  <div className="space-y-1">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="dup_action"
-                        value="skip"
-                        checked={duplicateAction === "skip"}
-                        onChange={() => setDuplicateAction("skip")}
-                        className="text-[#4338CA] focus:ring-[#4338CA]"
-                      />
-                      <span>
-                        Skip existing SKUs (preserve existing records)
-                      </span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="dup_action"
-                        value="update"
-                        checked={duplicateAction === "update"}
-                        onChange={() => setDuplicateAction("update")}
-                        className="text-[#4338CA] focus:ring-[#4338CA]"
-                      />
-                      <span>
-                        Update existing SKUs (overwrite name, prices, reorder
-                        levels)
-                      </span>
-                    </label>
+                  <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                    <span className="text-[11px] text-slate-500 block">
+                      Reorder Alert Level
+                    </span>
+                    <span className="text-base font-bold text-slate-900 font-mono">
+                      {detailProduct.reorder_level} units
+                    </span>
+                  </div>
+                  <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                    <span className="text-[11px] text-slate-500 block">
+                      Catalog Status
+                    </span>
+                    <span className="text-xs font-semibold text-slate-900 mt-1 block">
+                      {detailProduct.is_active ? "Active" : "Inactive"}
+                    </span>
                   </div>
                 </div>
 
-                <div className="pt-2 border-t border-slate-100 space-y-1.5">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={createMissingCats}
-                      onChange={(e) => setCreateMissingCats(e.target.checked)}
-                      className="rounded border-slate-300 text-[#4338CA] focus:ring-[#4338CA]"
-                    />
-                    <span>Automatically create missing categories</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={createMissingUnits}
-                      onChange={(e) => setCreateMissingUnits(e.target.checked)}
-                      className="rounded border-slate-300 text-[#4338CA] focus:ring-[#4338CA]"
-                    />
-                    <span>Automatically create missing units of measure</span>
-                  </label>
+                {detailProduct.description && (
+                  <div>
+                    <span className="font-semibold text-slate-800 block mb-1">
+                      Description
+                    </span>
+                    <p className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-slate-700 leading-relaxed">
+                      {detailProduct.description}
+                    </p>
+                  </div>
+                )}
+
+                <div className="border-t border-slate-200 pt-3 flex flex-wrap gap-4 text-[11px] text-slate-500">
+                  <div>
+                    Created:{" "}
+                    {new Date(detailProduct.created_at).toLocaleDateString()}
+                  </div>
+                  {detailProduct.low_stock_notified_at && (
+                    <div className="text-amber-800 font-medium">
+                      Low-Stock Notified:{" "}
+                      {new Date(
+                        detailProduct.low_stock_notified_at,
+                      ).toLocaleString()}
+                    </div>
+                  )}
                 </div>
               </div>
+            )}
 
-              {/* Sample preview table */}
-              {importPreviewData.sample_rows.length > 0 && (
-                <div>
-                  <span className="text-xs font-semibold text-slate-700 block mb-1">
-                    First {importPreviewData.sample_rows.length} rows preview:
-                  </span>
-                  <div className="overflow-x-auto border border-slate-200 rounded-lg">
-                    <table className="w-full text-left text-[11px]">
-                      <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
+            {/* Tab 2: Stock History */}
+            {detailTab === "history" && (
+              <div className="space-y-3">
+                {isDetailMovementsLoading ? (
+                  <TableSkeleton rows={4} columns={5} />
+                ) : !detailMovementsData?.data ||
+                  detailMovementsData.data.length === 0 ? (
+                  <div className="p-6 text-center bg-slate-50 rounded-lg border border-slate-200 text-xs text-slate-500">
+                    No stock movements recorded for this product yet.
+                  </div>
+                ) : (
+                  <div className="max-h-72 overflow-y-auto border border-slate-200 rounded-lg">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 sticky top-0 border-b border-slate-200 text-slate-600 font-semibold text-[11px]">
                         <tr>
-                          <th className="p-2">SKU</th>
-                          <th className="p-2">Name</th>
-                          <th className="p-2">Category</th>
-                          <th className="p-2">Unit</th>
-                          <th className="p-2 text-right">Sell Price</th>
-                          <th className="p-2 text-right">Stock</th>
+                          <th className="py-2 px-3">Date</th>
+                          <th className="py-2 px-3">Type</th>
+                          <th className="py-2 px-3 text-right">Change</th>
+                          {canManage && (
+                            <th className="py-2 px-3 text-right">Unit Cost</th>
+                          )}
+                          <th className="py-2 px-3">Reference / Reason</th>
+                          <th className="py-2 px-3">User</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {importPreviewData.sample_rows.map((row, i) => (
-                          <tr key={i}>
-                            <td className="p-2 font-mono font-bold text-slate-700">
-                              {row.sku}
-                            </td>
-                            <td className="p-2 font-medium text-slate-900">
-                              {row.name}
-                            </td>
-                            <td className="p-2 text-slate-600">
-                              {row.category_name}
-                            </td>
-                            <td className="p-2 text-slate-600">
-                              {row.unit_name || "-"}
-                            </td>
-                            <td className="p-2 text-right font-mono">
-                              {formatMoney(row.sell_price)}
-                            </td>
-                            <td className="p-2 text-right font-semibold">
-                              {row.stock_qty}
-                            </td>
-                          </tr>
-                        ))}
+                      <tbody className="divide-y divide-slate-200">
+                        {detailMovementsData.data.map((m: StockMovement) => {
+                          const isPositive = m.qty_change > 0;
+                          return (
+                            <tr key={m.id} className="hover:bg-slate-50/50">
+                              <td className="py-2 px-3 font-mono text-[11px] text-slate-600 whitespace-nowrap">
+                                {new Date(m.created_at).toLocaleDateString()}{" "}
+                                {new Date(m.created_at).toLocaleTimeString([], {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
+                              </td>
+                              <td className="py-2 px-3 uppercase text-[10px] font-semibold tracking-wider text-slate-700">
+                                {m.type}
+                              </td>
+                              <td className="py-2 px-3 text-right font-mono font-bold text-slate-900 whitespace-nowrap">
+                                <span className="inline-flex items-center gap-0.5 justify-end">
+                                  {isPositive ? (
+                                    <ArrowUpRight className="w-3.5 h-3.5 text-slate-700" />
+                                  ) : (
+                                    <ArrowDownRight className="w-3.5 h-3.5 text-slate-700" />
+                                  )}
+                                  <span>
+                                    {isPositive
+                                      ? `+${m.qty_change}`
+                                      : m.qty_change}
+                                  </span>
+                                </span>
+                              </td>
+                              {canManage && (
+                                <td className="py-2 px-3 text-right font-mono text-slate-600">
+                                  ${m.unit_cost}
+                                </td>
+                              )}
+                              <td className="py-2 px-3 text-slate-700 max-w-xs truncate">
+                                {m.reason ? (
+                                  <span>{m.reason}</span>
+                                ) : m.reference_label ? (
+                                  <span className="font-mono">
+                                    {m.reference_label}
+                                  </span>
+                                ) : m.reference_type ? (
+                                  <span className="font-mono">
+                                    {m.reference_type} #{m.reference_id}
+                                  </span>
+                                ) : (
+                                  "—"
+                                )}
+                              </td>
+                              <td className="py-2 px-3 text-slate-600 whitespace-nowrap">
+                                {m.user?.name || "System"}
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
+
+      {/* CSV Import Modal */}
+      <Modal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        title="Import Products via CSV"
+        description="Upload a CSV spreadsheet to bulk import or update products."
+        maxWidth="lg"
+        footer={
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsImportModalOpen(false)}
+            >
+              Done
+            </Button>
+            {!importResult && (
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleImportSubmit}
+                disabled={!importFile}
+                isLoading={importMutation.isPending}
+                leftIcon={<UploadCloud className="w-4 h-4" />}
+              >
+                Upload & Process
+              </Button>
+            )}
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
+            <div className="flex items-center gap-2">
+              <FileSpreadsheet className="w-5 h-5 text-[#4338CA]" />
+              <div className="text-xs">
+                <span className="font-semibold text-slate-900 block">
+                  CSV File Template
+                </span>
+                <span className="text-slate-500">
+                  Includes correct headers and sample products
+                </span>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDownloadTemplate}
+              leftIcon={<Download className="w-3.5 h-3.5" />}
+            >
+              Template
+            </Button>
+          </div>
+
+          {!importResult ? (
+            <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center bg-slate-50/50 hover:bg-slate-50 transition-colors">
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                id="csv_file_input"
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files?.[0]) {
+                    setImportFile(e.target.files[0]);
+                  }
+                }}
+              />
+              <label
+                htmlFor="csv_file_input"
+                className="cursor-pointer flex flex-col items-center justify-center"
+              >
+                <UploadCloud className="w-10 h-10 text-slate-400 mb-2" />
+                <span className="text-xs font-semibold text-slate-800">
+                  {importFile
+                    ? importFile.name
+                    : "Click to select CSV file from your computer"}
+                </span>
+                <span className="text-[11px] text-slate-500 mt-1">
+                  Required columns: sku, name, category, cost_price, sell_price
+                </span>
+              </label>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="p-3 bg-slate-100 rounded-lg border border-slate-200 text-xs">
+                <div className="font-bold text-slate-900 mb-1 flex items-center gap-1.5">
+                  <CheckCircle className="w-4 h-4 text-[#4338CA]" />
+                  <span>Import Results</span>
+                </div>
+                <div className="text-slate-700">
+                  Successfully imported:{" "}
+                  <span className="font-bold">
+                    {importResult.imported_count}
+                  </span>{" "}
+                  products
+                </div>
+                {Boolean(
+                  importResult.error_count && importResult.error_count > 0,
+                ) && (
+                  <div className="text-amber-900 font-semibold mt-0.5">
+                    Warnings / Errors: {importResult.error_count} rows skipped
+                  </div>
+                )}
+              </div>
+
+              {Boolean(
+                importResult.errors && importResult.errors.length > 0,
+              ) && (
+                <div className="max-h-48 overflow-y-auto border border-slate-200 rounded-lg">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-100 border-b border-slate-200 text-slate-600 font-semibold">
+                      <tr>
+                        <th className="py-2 px-3">Row</th>
+                        <th className="py-2 px-3">SKU</th>
+                        <th className="py-2 px-3">Issue</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200">
+                      {importResult.errors?.map((err: any, idx: number) => (
+                        <tr key={idx} className="bg-white">
+                          <td className="py-1.5 px-3 font-mono">{err.row}</td>
+                          <td className="py-1.5 px-3 font-mono">
+                            {err.sku || "—"}
+                          </td>
+                          <td className="py-1.5 px-3 text-slate-800 font-medium">
+                            {err.message}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
-
-              {/* Submit / back */}
-              <div className="flex justify-between items-center pt-3 border-t border-slate-100">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setImportPreviewData(null)}
-                >
-                  Back to File
-                </Button>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setIsImportModalOpen(false)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    disabled={
-                      commitMutation.isPending ||
-                      importPreviewData.valid_rows_count === 0
-                    }
-                    onClick={() => commitMutation.mutate()}
-                  >
-                    {commitMutation.isPending
-                      ? "Importing Products..."
-                      : `Confirm & Import (${importPreviewData.valid_rows_count} Valid Rows)`}
-                  </Button>
-                </div>
-              </div>
             </div>
           )}
         </div>
@@ -1479,15 +1306,15 @@ export const Products: React.FC = () => {
 
       {/* Delete Confirmation Dialog */}
       <ConfirmDialog
-        isOpen={!!deletingProduct}
-        title="Delete Product"
-        message={`Are you sure you want to delete "${deletingProduct?.name}" (SKU: ${deletingProduct?.sku})? This product will be soft-deleted.`}
-        confirmLabel="Delete Product"
-        isLoading={deleteMutation.isPending}
+        isOpen={Boolean(deletingProduct)}
+        onClose={() => setDeletingProduct(null)}
         onConfirm={() =>
           deletingProduct && deleteMutation.mutate(deletingProduct.id)
         }
-        onClose={() => setDeletingProduct(null)}
+        title="Delete Product"
+        message={`Are you sure you want to delete "${deletingProduct?.name}" (${deletingProduct?.sku})? This product will be soft-deleted and removed from active sales catalogs.`}
+        confirmLabel="Delete Product"
+        isLoading={deleteMutation.isPending}
       />
     </div>
   );

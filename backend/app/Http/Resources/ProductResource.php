@@ -22,6 +22,7 @@ class ProductResource extends JsonResource
             'unit_id' => $this->unit_id,
             'unit' => new UnitResource($this->whenLoaded('unit')),
             'cost_price' => $this->when($canViewCost, number_format((float) $this->cost_price, 2, '.', '')),
+            'avg_cost' => $this->when($canViewCost, number_format((float) ($this->avg_cost ?? $this->cost_price), 2, '.', '')),
             'sell_price' => number_format((float) $this->sell_price, 2, '.', ''),
             'stock_qty' => (int) $this->stock_qty,
             'reorder_level' => (int) $this->reorder_level,

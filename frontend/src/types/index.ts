@@ -57,6 +57,7 @@ export interface Product {
   unit_id?: number | null;
   unit?: Unit | null;
   cost_price?: string; // Optional because cashier cannot view cost_price
+  avg_cost?: string | null;
   sell_price: string;
   stock_qty: number;
   reorder_level: number;
@@ -120,9 +121,145 @@ export interface CsvImportPreview {
   }>;
 }
 
+export type CsvImportResult = CsvImportCommitResult;
+
 export interface CsvImportCommitResult {
+  error_count?: number;
+  errors?: CsvImportErrorRow[];
   imported_count: number;
   updated_count: number;
   skipped_count: number;
   message: string;
+}
+
+// Phase 2 Types
+export interface Supplier {
+  id: number;
+  name: string;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+  purchases_count?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export type PurchaseStatus = "draft" | "received";
+
+export interface PurchaseItem {
+  id: number;
+  purchase_id: number;
+  product_id: number;
+  product?: Product;
+  qty: number;
+  unit_cost: string;
+  line_total?: string;
+  subtotal?: string;
+}
+
+export interface Purchase {
+  id: number;
+  supplier_id: number;
+  supplier?: Supplier;
+  ref_no: string;
+  status: PurchaseStatus;
+  total: string;
+  notes?: string | null;
+  created_by: number;
+  creator?: User;
+  received_at?: string | null;
+  items?: PurchaseItem[];
+  items_count?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export type MovementType = "purchase" | "sale" | "adjustment" | "void";
+
+export interface StockMovement {
+  id: number;
+  product_id: number;
+  product?: Product;
+  type: MovementType;
+  qty_change: number;
+  unit_cost?: string | null;
+  reference_type?: string | null;
+  reference_id?: number | null;
+  reference?: {
+    id: number;
+    ref_no?: string;
+    number?: string;
+  } | null;
+  reference_label?: string | null;
+  reason?: string | null;
+  user_id: number;
+  user?: User;
+  created_at: string;
+}
+
+// Phase 3 Types: Sales & POS
+export interface Customer {
+  id: number;
+  name: string;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+  sales_count?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export type PaymentMethod = "cash" | "card" | "transfer";
+export type SaleStatus = "completed" | "void";
+
+export interface Invoice {
+  id: number;
+  sale_id: number;
+  number: string;
+  issued_at: string;
+  pdf_path?: string | null;
+}
+
+export interface SaleItem {
+  id: number;
+  sale_id: number;
+  product_id: number;
+  product?: Product;
+  qty: number;
+  unit_price: string;
+  unit_cost?: string | null;
+  line_total: string;
+}
+
+export interface Sale {
+  id: number;
+  customer_id?: number | null;
+  customer?: Customer | null;
+  user_id: number;
+  cashier?: User;
+  status: SaleStatus;
+  subtotal: string;
+  discount: string;
+  tax: string;
+  total: string;
+  payment_method: PaymentMethod;
+  amount_paid: string;
+  change_due: string;
+  notes?: string | null;
+  sold_at?: string | null;
+  voided_at?: string | null;
+  voided_by?: number | null;
+  voided_by_user?: User | null;
+  void_reason?: string | null;
+  items?: SaleItem[];
+  invoice?: Invoice | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CartItem {
+  product: Product;
+  qty: number;
+  unit_price: number;
+  line_total: number;
 }
