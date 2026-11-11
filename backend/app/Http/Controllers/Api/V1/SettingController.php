@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Setting\LogoUploadRequest;
 use App\Http\Requests\Setting\SettingUpdateRequest;
 use App\Models\Setting;
+use App\Services\AuditLogService;
 use App\Services\SettingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -25,7 +26,16 @@ class SettingController extends Controller
     {
         $this->authorize('update', Setting::class);
 
-        $updated = $settingService->setMany($request->validated());
+        $validated = $request->validated();
+        $updated = $settingService->setMany($validated);
+
+        app(AuditLogService::class)->log(
+            action: 'updated',
+            entity: 'Setting',
+            entityId: null,
+            changes: $validated,
+            user: $request->user()
+        );
 
         return response()->json([
             'message' => 'Settings updated successfully',

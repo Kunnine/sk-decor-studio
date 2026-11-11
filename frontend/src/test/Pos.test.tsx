@@ -1,5 +1,11 @@
 import React from "react";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter } from "react-router-dom";
@@ -105,7 +111,7 @@ describe("POS Checkout Component", () => {
     (productApi.posSearch as any).mockResolvedValue(mockProducts);
   });
 
-  it("renders products and allows adding an item to the cart", async () => {
+  it("renders products and allows adding an item to the cart only via (+) button", async () => {
     renderPos();
 
     await waitFor(() => {
@@ -113,8 +119,15 @@ describe("POS Checkout Component", () => {
       expect(screen.getByText("Premium Widget B")).toBeInTheDocument();
     });
 
-    // Add Widget A to cart
+    // Clicking the product name or card must NOT add to cart
     fireEvent.click(screen.getByText("Standard Widget A"));
+    expect(screen.getByText(/Current Sale \(0\)/i)).toBeInTheDocument();
+
+    // Add Widget A to cart via (+) button
+    const cards = screen.getAllByTestId("pos-product-card");
+    fireEvent.click(
+      within(cards[0]).getByRole("button", { name: "Increase quantity" }),
+    );
 
     // Cart shows 1 item with correct subtotal, tax (10%), and total
     await waitFor(() => {
@@ -135,10 +148,16 @@ describe("POS Checkout Component", () => {
     });
 
     // Widget B has stock_qty = 3
-    fireEvent.click(screen.getByText("Premium Widget B"));
+    const cards = screen.getAllByTestId("pos-product-card");
+    const widgetBCard = cards.find((c) =>
+      within(c).queryByText("Premium Widget B"),
+    )!;
+    fireEvent.click(
+      within(widgetBCard).getByRole("button", { name: "Increase quantity" }),
+    );
 
     await waitFor(() => {
-      expect(screen.getByDisplayValue("1")).toBeInTheDocument();
+      expect(screen.getAllByDisplayValue("1").length).toBeGreaterThanOrEqual(1);
     });
 
     // Find the "+" button inside cart
@@ -164,7 +183,10 @@ describe("POS Checkout Component", () => {
       expect(screen.getByText("Standard Widget A")).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByText("Standard Widget A")); // Total = $55.00
+    const cards = screen.getAllByTestId("pos-product-card");
+    fireEvent.click(
+      within(cards[0]).getByRole("button", { name: "Increase quantity" }),
+    ); // Total = $55.00
 
     await waitFor(() => {
       expect(screen.getByText("$55.00")).toBeInTheDocument();
@@ -211,7 +233,10 @@ describe("POS Checkout Component", () => {
       expect(screen.getByText("Standard Widget A")).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByText("Standard Widget A"));
+    const cards = screen.getAllByTestId("pos-product-card");
+    fireEvent.click(
+      within(cards[0]).getByRole("button", { name: "Increase quantity" }),
+    );
 
     await waitFor(() => {
       expect(screen.getByText("$55.00")).toBeInTheDocument();

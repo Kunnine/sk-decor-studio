@@ -175,10 +175,10 @@ export const Customers: React.FC = () => {
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+          <h1 className="text-2xl font-bold text-[#292824] tracking-tight">
             Customers
           </h1>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="text-sm text-[#88847D] mt-1">
             Manage your customer database and view purchase histories.
           </p>
         </div>
@@ -192,21 +192,21 @@ export const Customers: React.FC = () => {
       </div>
 
       {/* Filter / Search Bar */}
-      <div className="bg-white p-4 rounded-lg border border-slate-200">
+      <div className="bg-white p-4 rounded-[10px] border border-[#E8E3DA]">
         <div className="relative max-w-md">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <Search className="w-4 h-4 text-[#88847D] absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             placeholder="Search by name, phone, or email..."
             value={search}
             onChange={handleSearchChange}
-            className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#4338CA] focus:border-transparent"
+            className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-[#DDD6CA] bg-white text-[#292824] placeholder-[#88847D] focus:outline-none focus:ring-2 focus:ring-[#795438] focus:border-transparent"
           />
         </div>
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+      <div className="bg-white rounded-[10px] border border-[#E8E3DA] overflow-hidden">
         {isLoading ? (
           <div className="p-6 space-y-4">
             <Skeleton className="h-8 w-full" />
@@ -215,13 +215,13 @@ export const Customers: React.FC = () => {
             <Skeleton className="h-12 w-full" />
           </div>
         ) : isError ? (
-          <div className="p-8 text-center text-slate-600">
+          <div className="p-8 text-center text-[#88847D]">
             <AlertCircle className="w-8 h-8 text-amber-500 mx-auto mb-2" />
             <p>Failed to load customer list.</p>
           </div>
         ) : !data?.data?.length ? (
           <EmptyState
-            icon={<Users className="w-8 h-8 text-slate-400" />}
+            icon={<Users className="w-8 h-8 text-[#A58B6F]" />}
             title="No customers found"
             description={
               search
@@ -234,7 +234,7 @@ export const Customers: React.FC = () => {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 text-xs uppercase tracking-wider font-semibold">
+              <thead className="bg-[#F8F6F2] border-b border-[#E8E3DA] text-[#88847D] text-xs uppercase tracking-wider font-semibold">
                 <tr>
                   <th className="px-6 py-3">Customer</th>
                   <th className="px-6 py-3">Contact</th>
@@ -243,54 +243,54 @@ export const Customers: React.FC = () => {
                   <th className="px-6 py-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-[#E8E3DA]">
                 {data.data.map((customer) => (
                   <tr
                     key={customer.id}
-                    className="hover:bg-slate-50 transition-colors"
+                    className="hover:bg-[#FAF8F4] transition-colors"
                   >
                     <td className="px-6 py-4">
-                      <div className="font-semibold text-slate-900">
+                      <div className="font-semibold text-[#292824]">
                         {customer.name}
                       </div>
-                      <div className="text-xs text-slate-400">
+                      <div className="text-xs text-[#88847D]">
                         ID #{customer.id}
                       </div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="space-y-1">
                         {customer.phone && (
-                          <div className="flex items-center gap-1.5 text-xs text-slate-600">
-                            <Phone className="w-3.5 h-3.5 text-slate-400" />
+                          <div className="flex items-center gap-1.5 text-xs text-[#292824]">
+                            <Phone className="w-3.5 h-3.5 text-[#A58B6F]" />
                             <span>{customer.phone}</span>
                           </div>
                         )}
                         {customer.email && (
-                          <div className="flex items-center gap-1.5 text-xs text-slate-600">
-                            <Mail className="w-3.5 h-3.5 text-slate-400" />
+                          <div className="flex items-center gap-1.5 text-xs text-[#292824]">
+                            <Mail className="w-3.5 h-3.5 text-[#A58B6F]" />
                             <span>{customer.email}</span>
                           </div>
                         )}
                         {!customer.phone && !customer.email && (
-                          <span className="text-xs text-slate-400">
+                          <span className="text-xs text-[#88847D]">
                             No contact info
                           </span>
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4 max-w-xs truncate text-xs text-slate-600">
+                    <td className="px-6 py-4 max-w-xs truncate text-xs text-[#292824]">
                       {customer.address ? (
                         <div className="flex items-center gap-1.5">
-                          <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <MapPin className="w-3.5 h-3.5 text-[#A58B6F] shrink-0" />
                           <span className="truncate">{customer.address}</span>
                         </div>
                       ) : (
-                        <span className="text-slate-400">—</span>
+                        <span className="text-[#88847D]">—</span>
                       )}
                     </td>
                     <td className="px-6 py-4 text-center">
-                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-full">
-                        <ShoppingBag className="w-3 h-3 text-slate-400" />
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#292824] bg-[#F8F6F2] border border-[#E8E3DA] px-2 py-0.5 rounded-full">
+                        <ShoppingBag className="w-3 h-3 text-[#A58B6F]" />
                         {customer.sales_count ?? 0}
                       </span>
                     </td>
@@ -300,14 +300,14 @@ export const Customers: React.FC = () => {
                           <>
                             <button
                               onClick={() => openEditModal(customer)}
-                              className="p-1.5 text-slate-500 hover:text-[#4338CA] hover:bg-slate-100 rounded"
+                              className="p-1.5 text-[#88847D] hover:text-[#795438] hover:bg-[#F3EDE6] rounded"
                               title="Edit customer"
                             >
                               <Edit2 className="w-4 h-4" />
                             </button>
                             <button
                               onClick={() => setDeletingCustomer(customer)}
-                              className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded"
+                              className="p-1.5 text-[#88847D] hover:text-[#292824] hover:bg-[#F3EDE6] rounded"
                               title="Delete customer"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -325,7 +325,7 @@ export const Customers: React.FC = () => {
 
         {/* Pagination */}
         {data?.meta && data.meta.last_page > 1 && (
-          <div className="px-6 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-600">
+          <div className="px-6 py-3 bg-[#F8F6F2] border-t border-[#E8E3DA] flex items-center justify-between text-xs text-[#88847D]">
             <div>
               Showing {data.meta.from ?? 0} to {data.meta.to ?? 0} of{" "}
               {data.meta.total} customers
@@ -339,7 +339,7 @@ export const Customers: React.FC = () => {
               >
                 Previous
               </Button>
-              <span className="font-semibold text-slate-700">
+              <span className="font-semibold text-[#292824]">
                 Page {page} of {data.meta.last_page}
               </span>
               <Button
@@ -370,11 +370,11 @@ export const Customers: React.FC = () => {
           )}
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+            <label className="block text-xs font-semibold text-[#292824] uppercase tracking-wider mb-1">
               Full Name <span className="text-amber-600">*</span>
             </label>
             <Input
-              placeholder="e.g. Acme Supplies or John Doe"
+              placeholder="e.g. Clara Vance or Velvet Living Studio"
               {...register("name")}
               error={errors.name?.message}
             />
@@ -382,7 +382,7 @@ export const Customers: React.FC = () => {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+              <label className="block text-xs font-semibold text-[#292824] uppercase tracking-wider mb-1">
                 Phone Number
               </label>
               <Input
@@ -393,7 +393,7 @@ export const Customers: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+              <label className="block text-xs font-semibold text-[#292824] uppercase tracking-wider mb-1">
                 Email Address
               </label>
               <Input
@@ -406,14 +406,14 @@ export const Customers: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+            <label className="block text-xs font-semibold text-[#292824] uppercase tracking-wider mb-1">
               Physical Address
             </label>
             <textarea
               rows={2}
               placeholder="e.g. 123 Main St, Suite 400"
               {...register("address")}
-              className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#4338CA] focus:border-transparent"
+              className="w-full px-3 py-2 text-sm rounded-lg border border-[#DDD6CA] bg-white text-[#292824] focus:outline-none focus:ring-2 focus:ring-[#795438] focus:border-transparent"
             />
             {errors.address && (
               <p className="text-xs text-amber-700 mt-1 font-medium">
@@ -422,7 +422,7 @@ export const Customers: React.FC = () => {
             )}
           </div>
 
-          <div className="flex justify-end gap-3 pt-3 border-t border-slate-200">
+          <div className="flex justify-end gap-3 pt-3 border-t border-[#E8E3DA]">
             <Button
               type="button"
               variant="outline"

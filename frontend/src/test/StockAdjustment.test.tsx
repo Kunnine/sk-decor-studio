@@ -39,6 +39,7 @@ vi.mock("../api/products", () => ({
     create: vi.fn(),
     update: vi.fn(),
     delete: vi.fn(),
+    toggleActive: vi.fn(),
   },
 }));
 
@@ -144,6 +145,9 @@ describe("Stock Adjustment & Product Details", () => {
   it("opens adjustment modal, validates delta, and checks projected stock", async () => {
     renderWithProviders(<Products />);
 
+    const listToggle = await screen.findByRole("button", { name: "List view" });
+    fireEvent.click(listToggle);
+
     await waitFor(() => {
       expect(screen.getByText("SKU-TEST-100")).toBeInTheDocument();
     });
@@ -182,6 +186,9 @@ describe("Stock Adjustment & Product Details", () => {
   it("opens product details modal and switches to stock history tab", async () => {
     renderWithProviders(<Products />);
 
+    const listToggle = await screen.findByRole("button", { name: "List view" });
+    fireEvent.click(listToggle);
+
     await waitFor(() => {
       expect(screen.getByText("SKU-TEST-100")).toBeInTheDocument();
     });
@@ -213,7 +220,7 @@ describe("Stock Adjustment & Product Details", () => {
     renderWithProviders(<Products />);
 
     await waitFor(() => {
-      expect(screen.getByText("SKU-TEST-100")).toBeInTheDocument();
+      expect(screen.getByText("Precision Test Widget")).toBeInTheDocument();
     });
 
     // Click Add Product button

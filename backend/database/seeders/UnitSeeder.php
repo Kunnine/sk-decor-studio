@@ -11,6 +11,8 @@ class UnitSeeder extends Seeder
     {
         $units = [
             ['name' => 'Piece', 'short_name' => 'pc'],
+            ['name' => 'Set', 'short_name' => 'set'],
+            ['name' => 'Pair', 'short_name' => 'pr'],
             ['name' => 'Kilogram', 'short_name' => 'kg'],
             ['name' => 'Box', 'short_name' => 'box'],
             ['name' => 'Meter', 'short_name' => 'm'],

@@ -13,6 +13,7 @@ export interface PurchaseFilters {
 
 export interface PurchaseItemInput {
   product_id: number;
+  product_variant_id?: number | null;
   qty: number;
   unit_cost: number;
 }

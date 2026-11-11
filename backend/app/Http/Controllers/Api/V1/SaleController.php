@@ -20,7 +20,7 @@ class SaleController extends Controller
 
         $user = $request->user();
         $query = Sale::query()
-            ->with(['customer', 'user', 'invoice', 'items.product.unit'])
+            ->with(['customer', 'user', 'invoice', 'items.product.unit', 'items.variant'])
             ->forUser($user);
 
         // Filter by status (completed, void)
@@ -85,6 +85,7 @@ class SaleController extends Controller
             'voidedByUser',
             'invoice',
             'items.product.unit',
+            'items.variant',
         ]);
 
         return response()->json([

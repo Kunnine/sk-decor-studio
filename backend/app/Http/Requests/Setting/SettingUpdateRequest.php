@@ -21,6 +21,10 @@ class SettingUpdateRequest extends FormRequest
             'default_reorder_level' => ['required', 'integer', 'min:0'],
             'invoice_prefix' => ['required', 'string', 'max:20'],
             'date_format' => ['required', 'string', 'max:20'],
+            'digest_time' => ['sometimes', 'nullable', 'string', 'regex:/^(?:2[0-3]|[01][0-9]):[0-5][0-9]$/'],
+            'low_stock_email_alerts' => ['sometimes', 'nullable'],
+            'low_stock_digest' => ['sometimes', 'nullable'],
+            'slow_moving_days' => ['sometimes', 'nullable', 'integer', 'min:1'],
         ];
     }
 }

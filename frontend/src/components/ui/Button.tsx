@@ -29,18 +29,18 @@ export const Button: React.FC<ButtonProps> = ({
     lg: "px-5 py-2.5 text-base gap-2.5",
   };
 
-  // Strictly TWO COLORS ONLY: Indigo #4338CA, Amber #F59E0B, Slate/Neutrals. No red or green!
+  // Minimal Scandinavian & Japandi luxury palette: Dark warm brown #795438, Accent #A58B6F, Warm Neutrals
   const variantStyles = {
     primary:
-      "bg-[#4338CA] hover:bg-[#3730A3] text-white focus:ring-[#4338CA] border border-transparent shadow-none",
+      "bg-[#795438] hover:bg-[#63432B] active:bg-[#523621] text-white focus:ring-[#795438] border border-transparent shadow-none",
     secondary:
-      "bg-slate-100 hover:bg-slate-200 text-slate-900 focus:ring-slate-400 border border-slate-200",
+      "bg-[#F3EDE6] hover:bg-[#EAE1D6] text-[#292824] focus:ring-[#A58B6F] border border-[#E2D9CE]",
     outline:
-      "bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 focus:ring-[#4338CA]",
+      "bg-white hover:bg-[#F8F6F2] text-[#292824] border border-[#DDD6CA] focus:ring-[#795438]",
     ghost:
-      "bg-transparent hover:bg-slate-100 text-slate-700 focus:ring-slate-300 border border-transparent",
+      "bg-transparent hover:bg-[#EFEAE2]/70 text-[#292824] focus:ring-[#A58B6F] border border-transparent",
     danger:
-      "bg-slate-900 hover:bg-slate-800 text-white border border-slate-900 focus:ring-slate-900 font-semibold",
+      "bg-[#292824] hover:bg-[#3D3B35] text-white border border-[#292824] focus:ring-[#292824] font-semibold",
   };
 
   return (

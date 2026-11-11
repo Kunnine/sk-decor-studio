@@ -4,8 +4,9 @@ import { describe, it, expect, vi } from "vitest";
 import { BrowserRouter } from "react-router-dom";
 import { Login } from "../pages/Login";
 import { AuthProvider } from "../context/AuthContext";
+import { authApi } from "../api/auth";
 
-// Mock auth context or api
+// Mock auth api
 vi.mock("../api/auth", () => ({
   authApi: {
     login: vi.fn().mockResolvedValue({
@@ -22,7 +23,7 @@ vi.mock("../api/auth", () => ({
 }));
 
 describe("Login Component", () => {
-  it("renders login form and demo fill buttons", () => {
+  it("renders login form with email and password fields without demo credentials", () => {
     render(
       <BrowserRouter>
         <AuthProvider>
@@ -32,20 +33,27 @@ describe("Login Component", () => {
     );
 
     expect(screen.getByLabelText(/email address/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^password/i)).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /sign in/i }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /admin/i })).toBeInTheDocument();
+
+    // Verify demo buttons are not present
     expect(
-      screen.getByRole("button", { name: /manager/i }),
-    ).toBeInTheDocument();
+      screen.queryByRole("button", { name: /^admin$/i }),
+    ).not.toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: /cashier/i }),
-    ).toBeInTheDocument();
+      screen.queryByRole("button", { name: /^manager$/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^cashier$/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/one-click demo credentials/i),
+    ).not.toBeInTheDocument();
   });
 
-  it("populates credentials when clicking demo buttons", async () => {
+  it("allows user to manually input email and password and submit", async () => {
     render(
       <BrowserRouter>
         <AuthProvider>
@@ -54,13 +62,54 @@ describe("Login Component", () => {
       </BrowserRouter>,
     );
 
-    const adminBtn = screen.getByRole("button", { name: /admin/i });
-    fireEvent.click(adminBtn);
+    const emailInput = screen.getByLabelText(/email address/i);
+    const passwordInput = screen.getByLabelText(/^password/i);
 
-    const emailInput = screen.getByLabelText(
-      /email address/i,
-    ) as HTMLInputElement;
-    expect(emailInput.value).toBe("admin@inventory.test");
+    fireEvent.change(emailInput, {
+      target: { value: "user@customdomain.com" },
+    });
+    fireEvent.change(passwordInput, { target: { value: "MySecretPass!23" } });
+
+    expect((emailInput as HTMLInputElement).value).toBe(
+      "user@customdomain.com",
+    );
+    expect((passwordInput as HTMLInputElement).value).toBe("MySecretPass!23");
+
+    const submitBtn = screen.getByRole("button", { name: /sign in/i });
+    fireEvent.click(submitBtn);
+
+    await waitFor(() => {
+      expect(authApi.login).toHaveBeenCalledWith({
+        email: "user@customdomain.com",
+        password: "MySecretPass!23",
+      });
+    });
+  });
+
+  it("toggles password visibility when clicking the eye icon button", async () => {
+    render(
+      <BrowserRouter>
+        <AuthProvider>
+          <Login />
+        </AuthProvider>
+      </BrowserRouter>,
+    );
+
+    const passwordInput = (await screen.findByLabelText(
+      /^password/i,
+    )) as HTMLInputElement;
+    expect(passwordInput.type).toBe("password");
+
+    const toggleBtn = screen.getByRole("button", { name: /show password/i });
+    fireEvent.click(toggleBtn);
+
+    expect(passwordInput.type).toBe("text");
+    expect(
+      screen.getByRole("button", { name: /hide password/i }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /hide password/i }));
+    expect(passwordInput.type).toBe("password");
   });
 
   it("shows validation error when email is invalid", async () => {

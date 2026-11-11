@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Purchase\PurchaseStoreRequest;
 use App\Http\Requests\Purchase\PurchaseUpdateRequest;
 use App\Http\Resources\PurchaseResource;
+use App\Models\ProductVariant;
 use App\Models\Purchase;
 use App\Models\PurchaseItem;
 use App\Services\StockService;
@@ -75,9 +76,14 @@ class PurchaseController extends Controller
             ]);
 
             foreach ($validated['items'] as $item) {
+                $variantId = ! empty($item['product_variant_id']) ? (int) $item['product_variant_id'] : null;
+                $variant = $variantId ? ProductVariant::find($variantId) : null;
+
                 PurchaseItem::create([
                     'purchase_id' => $purchase->id,
                     'product_id' => $item['product_id'],
+                    'product_variant_id' => $variant?->id,
+                    'variant_label' => $variant?->label(),
                     'qty' => $item['qty'],
                     'unit_cost' => $item['unit_cost'],
                 ]);
@@ -86,7 +92,7 @@ class PurchaseController extends Controller
             return $purchase;
         });
 
-        $purchase->load(['supplier', 'creator', 'items.product']);
+        $purchase->load(['supplier', 'creator', 'items.product', 'items.variant']);
 
         return response()->json([
             'message' => 'Purchase order created in draft status.',
@@ -98,7 +104,7 @@ class PurchaseController extends Controller
     {
         $this->authorize('view', $purchase);
 
-        $purchase->load(['supplier', 'creator', 'items.product.category']);
+        $purchase->load(['supplier', 'creator', 'items.product.category', 'items.variant']);
 
         return response()->json([
             'data' => new PurchaseResource($purchase),
@@ -122,9 +128,14 @@ class PurchaseController extends Controller
                 $total = 0.00;
                 foreach ($validated['items'] as $item) {
                     $total += ((int) $item['qty'] * (float) $item['unit_cost']);
+                    $variantId = ! empty($item['product_variant_id']) ? (int) $item['product_variant_id'] : null;
+                    $variant = $variantId ? ProductVariant::find($variantId) : null;
+
                     PurchaseItem::create([
                         'purchase_id' => $purchase->id,
                         'product_id' => $item['product_id'],
+                        'product_variant_id' => $variant?->id,
+                        'variant_label' => $variant?->label(),
                         'qty' => $item['qty'],
                         'unit_cost' => $item['unit_cost'],
                     ]);
@@ -149,7 +160,7 @@ class PurchaseController extends Controller
             return $purchase;
         });
 
-        $updatedPurchase->load(['supplier', 'creator', 'items.product']);
+        $updatedPurchase->load(['supplier', 'creator', 'items.product', 'items.variant']);
 
         return response()->json([
             'message' => 'Purchase order updated successfully.',
@@ -186,7 +197,7 @@ class PurchaseController extends Controller
 
         try {
             $receivedPurchase = $this->stockService->receive($purchase, $request->user());
-            $receivedPurchase->load(['supplier', 'creator', 'items.product']);
+            $receivedPurchase->load(['supplier', 'creator', 'items.product', 'items.variant']);
 
             return response()->json([
                 'message' => "Purchase '{$receivedPurchase->ref_no}' received successfully. Inventory and average costs updated.",

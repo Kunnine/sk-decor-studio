@@ -25,11 +25,6 @@ export const settingsApi = {
     const res = await api.post<{ message: string; data: AppSettings }>(
       "/settings/logo",
       formData,
-      {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      },
     );
     return res.data;
   },

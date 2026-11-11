@@ -6,6 +6,10 @@ export interface User {
   email: string;
   role: Role;
   is_active: boolean;
+  email_alerts_enabled?: boolean | null;
+  digest_enabled?: boolean | null;
+  wants_low_stock_email?: boolean;
+  wants_low_stock_digest?: boolean;
   permissions?: string[];
   created_at?: string;
   updated_at?: string;
@@ -47,6 +51,25 @@ export interface Category {
   updated_at?: string;
 }
 
+export interface ProductVariant {
+  id?: number;
+  product_id?: number;
+  sku: string;
+  name?: string | null;
+  color?: string | null;
+  size?: string | null;
+  material?: string | null;
+  style?: string | null;
+  cost_price?: string | number;
+  avg_cost?: string | number | null;
+  sell_price: string | number;
+  stock_qty: number;
+  reorder_level: number;
+  is_active: boolean;
+  is_low_stock?: boolean;
+  label?: string;
+}
+
 export interface Product {
   id: number;
   sku: string;
@@ -54,13 +77,22 @@ export interface Product {
   description?: string | null;
   category_id: number;
   category?: Category | null;
+  parent_category?: Category | null;
   unit_id?: number | null;
   unit?: Unit | null;
+  supplier_id?: number | null;
+  supplier?: Supplier | null;
   cost_price?: string; // Optional because cashier cannot view cost_price
   avg_cost?: string | null;
   sell_price: string;
   stock_qty: number;
   reorder_level: number;
+  color?: string | null;
+  size?: string | null;
+  material?: string | null;
+  style?: string | null;
+  has_variants?: boolean;
+  variants?: ProductVariant[];
   image_url?: string | null;
   thumb_url?: string | null;
   is_active: boolean;
@@ -151,6 +183,9 @@ export interface PurchaseItem {
   purchase_id: number;
   product_id: number;
   product?: Product;
+  product_variant_id?: number | null;
+  variant_label?: string | null;
+  variant?: ProductVariant | null;
   qty: number;
   unit_cost: string;
   line_total?: string;
@@ -180,6 +215,9 @@ export interface StockMovement {
   id: number;
   product_id: number;
   product?: Product;
+  product_variant_id?: number | null;
+  variant_label?: string | null;
+  variant?: ProductVariant | null;
   type: MovementType;
   qty_change: number;
   unit_cost?: string | null;
@@ -225,6 +263,9 @@ export interface SaleItem {
   sale_id: number;
   product_id: number;
   product?: Product;
+  product_variant_id?: number | null;
+  variant_label?: string | null;
+  variant?: ProductVariant | null;
   qty: number;
   unit_price: string;
   unit_cost?: string | null;
@@ -259,7 +300,137 @@ export interface Sale {
 
 export interface CartItem {
   product: Product;
+  variant?: ProductVariant | null;
   qty: number;
   unit_price: number;
   line_total: number;
+}
+
+// Phase 4 Types: Insights, Notifications, Analytics, Reports & Audit
+export interface NotificationData {
+  type?: string;
+  product_id?: number;
+  sku?: string;
+  name?: string;
+  stock_qty?: number;
+  reorder_level?: number;
+  deficit?: number;
+  unit?: string;
+  thumb_url?: string | null;
+  message: string;
+}
+
+export interface NotificationItem {
+  id: string;
+  type: string;
+  notifiable_type: string;
+  notifiable_id: number;
+  data: NotificationData;
+  read_at?: string | null;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface MetricWithChange {
+  current: number;
+  previous: number;
+  change: number;
+  change_pct: number;
+}
+
+export interface AnalyticsSummary {
+  revenue: MetricWithChange;
+  orders: MetricWithChange;
+  average_order_value: MetricWithChange;
+  units_sold: MetricWithChange;
+  gross_profit: MetricWithChange;
+  gross_margin_pct: MetricWithChange;
+  low_stock_count: MetricWithChange;
+  total_products?: number;
+  total_categories?: number;
+  total_stock_value?: number;
+  period: {
+    from: string;
+    to: string;
+    prev_from: string;
+    prev_to: string;
+  };
+}
+
+export interface SalesTrendPoint {
+  date: string;
+  revenue: number;
+  orders: number;
+  profit: number;
+}
+
+export interface TopProductAnalytics {
+  id: number;
+  sku: string;
+  name: string;
+  thumb_url?: string | null;
+  quantity: number;
+  revenue: number;
+}
+
+export interface CategorySalesAnalytics {
+  category_id: number;
+  category_name: string;
+  revenue: number;
+  units_sold: number;
+  percentage: number;
+}
+
+export interface SlowMoverItem {
+  id: number;
+  sku: string;
+  name: string;
+  stock_qty: number;
+  unit: string;
+  unit_cost: number;
+  total_value: number;
+  thumb_url?: string | null;
+  last_sold_at?: string | null;
+}
+
+export interface ValuationAnalytics {
+  total_valuation: number;
+  total_units: number;
+  total_products: number;
+  by_category: Array<{
+    category: string;
+    products_count: number;
+    total_stock: number;
+    valuation: number;
+  }>;
+  slow_movers: SlowMoverItem[];
+  slow_moving_days: number;
+}
+
+export interface PaymentMethodAnalytics {
+  payment_method: string;
+  orders_count: number;
+  revenue: number;
+  percentage: number;
+}
+
+export interface CashierAnalytics {
+  user_id: number;
+  cashier_name: string;
+  orders_count: number;
+  revenue: number;
+  percentage: number;
+}
+
+export interface AuditLogItem {
+  id: number;
+  user_id?: number | null;
+  user_name: string;
+  user_email?: string | null;
+  action: string;
+  entity: string;
+  entity_id?: number | null;
+  changes?: Record<string, unknown> | null;
+  ip?: string | null;
+  created_at: string;
 }

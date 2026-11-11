@@ -1,5 +1,5 @@
-import React, { useRef, useState } from "react";
-import { UploadCloud, X, Image as ImageIcon, AlertCircle } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import { UploadCloud, AlertCircle } from "lucide-react";
 
 interface ImageUploaderProps {
   currentImageUrl?: string | null;
@@ -7,6 +7,12 @@ interface ImageUploaderProps {
   onRemoveExisting?: () => void;
   disabled?: boolean;
 }
+
+const formatFileSize = (bytes: number): string => {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+};
 
 export const ImageUploader: React.FC<ImageUploaderProps> = ({
   currentImageUrl,
@@ -16,18 +22,52 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
 }) => {
   const [dragOver, setDragOver] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [selectedFileMeta, setSelectedFileMeta] = useState<{
+    name: string;
+    size: number;
+  } | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const objectUrlRef = useRef<string | null>(null);
+
+  const revokeObjectUrl = () => {
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current);
+      objectUrlRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      revokeObjectUrl();
+    };
+  }, []);
 
   const validateAndHandleFile = (file: File) => {
     setErrorMessage(null);
 
-    // Validate type
-    const validTypes = ["image/jpeg", "image/png", "image/webp"];
-    if (!validTypes.includes(file.type)) {
+    // Validate format (JPG, JPEG, PNG, WebP)
+    const validTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+    const hasValidExtension = /\.(jpe?g|png|webp)$/i.test(file.name);
+    const hasValidMime = file.type
+      ? validTypes.includes(file.type.toLowerCase())
+      : hasValidExtension;
+
+    if (!hasValidMime) {
       setErrorMessage(
-        "Invalid file type. Please upload a JPG, PNG, or WebP image.",
+        "Invalid file type. Please upload a JPG, JPEG, PNG, or WebP image.",
       );
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+      return;
+    }
+
+    if (file.size <= 0) {
+      setErrorMessage("Selected image file is empty.");
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
       return;
     }
 
@@ -35,6 +75,9 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
     const maxSize = 2 * 1024 * 1024;
     if (file.size > maxSize) {
       setErrorMessage("Image size exceeds 2MB limit.");
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
       return;
     }
 
@@ -47,15 +90,24 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
           `Image dimensions (${img.naturalWidth}x${img.naturalHeight}px) are too small. Minimum is 200x200px.`,
         );
         URL.revokeObjectURL(objectUrl);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
         return;
       }
 
+      revokeObjectUrl();
+      objectUrlRef.current = objectUrl;
       setPreviewUrl(objectUrl);
+      setSelectedFileMeta({ name: file.name, size: file.size });
       onFileSelect(file);
     };
     img.onerror = () => {
       setErrorMessage("Failed to read image file.");
       URL.revokeObjectURL(objectUrl);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     };
     img.src = objectUrl;
   };
@@ -89,7 +141,9 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
   };
 
   const handleClear = () => {
+    revokeObjectUrl();
     setPreviewUrl(null);
+    setSelectedFileMeta(null);
     setErrorMessage(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -107,7 +161,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/jpeg,image/png,image/webp"
+        accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
         onChange={handleFileInputChange}
         disabled={disabled}
         className="hidden"
@@ -115,48 +169,54 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
       />
 
       {activeImage ? (
-        <div className="relative border border-slate-200 rounded-lg p-2 bg-slate-50 flex items-center gap-4">
-          <img
-            src={activeImage}
-            alt="Preview"
-            className="w-20 h-20 object-cover rounded-md border border-slate-200 bg-white"
-          />
+        <div
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          className={`rounded-lg p-3 bg-white border transition-colors flex flex-col sm:flex-row sm:items-center gap-4 ${
+            dragOver ? "border-[#795438] bg-[#F3EDE6]/40" : "border-[#E8E3DA]"
+          }`}
+        >
+          <div className="w-24 h-28 sm:w-24 sm:h-28 rounded-lg border border-[#E8E3DA] bg-[#F8F6F2] overflow-hidden shrink-0">
+            <img
+              src={activeImage}
+              alt="Preview"
+              className="w-full h-full object-cover"
+            />
+          </div>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-slate-800">
+            <p className="text-xs font-semibold text-[#292824]">
               {previewUrl ? "New image selected" : "Current product image"}
             </p>
-            <p className="text-[11px] text-slate-500 mt-0.5">
-              Processed as WebP main (max 800px) and thumbnail (200x200)
-            </p>
-            <div className="mt-2 flex gap-2">
+            {selectedFileMeta ? (
+              <p className="text-[11px] text-[#88847D] mt-0.5 truncate">
+                {selectedFileMeta.name} ({formatFileSize(selectedFileMeta.size)}
+                )
+              </p>
+            ) : (
+              <p className="text-[11px] text-[#88847D] mt-0.5">
+                Drag and drop a new image here or choose Replace below
+              </p>
+            )}
+            <div className="mt-3 flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={disabled}
-                className="text-xs font-semibold text-[#4338CA] hover:underline"
+                className="px-3 py-1.5 text-xs font-medium rounded-md bg-[#795438] text-white hover:bg-[#63432B] transition-colors disabled:opacity-50"
               >
                 Replace
               </button>
-              <span className="text-slate-300">|</span>
               <button
                 type="button"
                 onClick={handleClear}
                 disabled={disabled}
-                className="text-xs font-semibold text-slate-600 hover:text-slate-900"
+                className="px-3 py-1.5 text-xs font-medium rounded-md border border-[#DDD6CA] bg-[#F8F6F2] text-[#292824] hover:bg-[#EFEAE2] transition-colors disabled:opacity-50"
               >
                 Remove
               </button>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={handleClear}
-            disabled={disabled}
-            className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-200"
-            title="Remove image"
-          >
-            <X className="w-4 h-4" />
-          </button>
         </div>
       ) : (
         <div
@@ -164,25 +224,25 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
           onClick={() => !disabled && fileInputRef.current?.click()}
-          className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
+          className={`border-2 border-dashed rounded-lg p-5 text-center cursor-pointer transition-colors ${
             dragOver
-              ? "border-[#4338CA] bg-indigo-50/20"
-              : "border-slate-300 hover:border-slate-400 bg-white"
+              ? "border-[#795438] bg-[#F3EDE6]/50"
+              : "border-[#DDD6CA] hover:border-[#795438] bg-white"
           } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
         >
           <div className="flex flex-col items-center justify-center gap-2">
-            <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600">
-              <UploadCloud className="w-5 h-5 text-slate-600" />
+            <div className="w-10 h-10 rounded-full bg-[#F8F6F2] flex items-center justify-center text-[#795438]">
+              <UploadCloud className="w-5 h-5 text-[#795438]" />
             </div>
             <div>
-              <p className="text-xs font-semibold text-slate-800">
-                <span className="text-[#4338CA] hover:underline">
+              <p className="text-xs font-semibold text-[#292824]">
+                <span className="text-[#795438] hover:underline">
                   Click to upload
                 </span>{" "}
                 or drag and drop
               </p>
-              <p className="text-[11px] text-slate-500 mt-0.5">
-                WebP, PNG, or JPG (max 2MB, min 200×200px)
+              <p className="text-[11px] text-[#88847D] mt-0.5">
+                WebP, PNG, or JPG / JPEG (max 2MB, min 200×200px)
               </p>
             </div>
           </div>
@@ -190,8 +250,11 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
       )}
 
       {errorMessage && (
-        <div className="flex items-center gap-1.5 text-xs text-amber-800 bg-amber-50 border border-amber-200 px-2.5 py-1.5 rounded-md">
-          <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+        <div
+          role="alert"
+          className="flex items-center gap-1.5 text-xs text-[#292824] bg-[#F3EDE6] border border-[#DDD6CA] px-3 py-2 rounded-md"
+        >
+          <AlertCircle className="w-4 h-4 text-[#795438] shrink-0" />
           <span>{errorMessage}</span>
         </div>
       )}

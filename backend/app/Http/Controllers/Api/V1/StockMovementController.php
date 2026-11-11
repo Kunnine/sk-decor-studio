@@ -15,7 +15,7 @@ class StockMovementController extends Controller
         $this->authorize('viewAny', StockMovement::class);
 
         $query = StockMovement::query()
-            ->with(['product', 'user', 'reference']);
+            ->with(['product', 'variant', 'user', 'reference']);
 
         if ($request->filled('product_id')) {
             $query->where('product_id', $request->integer('product_id'));

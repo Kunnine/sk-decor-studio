@@ -52,10 +52,10 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
       }
     >
       <div className="flex items-start gap-3">
-        <div className="shrink-0 p-2 bg-slate-100 rounded-lg text-slate-800">
-          <AlertCircle className="w-5 h-5 text-slate-800" />
+        <div className="shrink-0 p-2 bg-[#F3EDE6] rounded-lg text-[#795438]">
+          <AlertCircle className="w-5 h-5 text-[#795438]" />
         </div>
-        <div className="text-sm text-slate-600 leading-relaxed pt-1">
+        <div className="text-sm text-[#88847D] leading-relaxed pt-1">
           {message}
         </div>
       </div>

@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -41,6 +42,13 @@ import { Badge } from "../components/ui/Badge";
 
 const purchaseItemSchema = z.object({
   product_id: z.number().min(1, "Please select a product"),
+  product_variant_id: z.preprocess(
+    (v) =>
+      v === "" || v === null || v === undefined || Number.isNaN(Number(v))
+        ? null
+        : Number(v),
+    z.number().nullable().optional(),
+  ),
   qty: z.number().int().min(1, "Quantity must be at least 1"),
   unit_cost: z.number().min(0, "Cost must be non-negative"),
 });
@@ -79,6 +87,7 @@ export const Purchases: React.FC = () => {
   const [deletingPurchase, setDeletingPurchase] = useState<Purchase | null>(
     null,
   );
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // Queries
   const { data: purchasesData, isLoading } = useQuery({
@@ -111,14 +120,66 @@ export const Purchases: React.FC = () => {
     setValue,
     formState: { errors },
   } = useForm<PurchaseFormData>({
-    resolver: zodResolver(purchaseSchema),
+    resolver: zodResolver(purchaseSchema) as any,
     defaultValues: {
       supplier_id: "" as any,
       ref_no: "",
       notes: "",
-      items: [{ product_id: "" as any, qty: 1, unit_cost: 0 }],
+      items: [
+        {
+          product_id: "" as any,
+          product_variant_id: null,
+          qty: 1,
+          unit_cost: 0,
+        },
+      ],
     },
   });
+
+  // Handle shortcut from low-stock page to prefill a draft purchase
+  useEffect(() => {
+    if (searchParams.get("create") === "true") {
+      const pid = searchParams.get("product_id");
+      const suggestedQty = searchParams.get("suggested_qty");
+      const year = new Date().getFullYear();
+      const rand = Math.floor(1000 + Math.random() * 9000);
+
+      const matchedProduct = pid
+        ? products.find((p) => p.id === Number(pid))
+        : null;
+      const cost = matchedProduct
+        ? parseFloat(
+            String(matchedProduct.avg_cost || matchedProduct.cost_price || 0),
+          )
+        : 0;
+
+      reset({
+        supplier_id: "" as any,
+        ref_no: `PO-${year}-${rand}`,
+        notes: pid
+          ? `Auto-generated restock for ${matchedProduct?.name || "low stock item"}`
+          : "",
+        items: [
+          {
+            product_id: pid ? Number(pid) : ("" as any),
+            product_variant_id:
+              matchedProduct?.variants && matchedProduct.variants.length > 0
+                ? (matchedProduct.variants[0].id ?? null)
+                : null,
+            qty: suggestedQty ? Math.max(1, parseInt(suggestedQty, 10)) : 10,
+            unit_cost: cost,
+          },
+        ],
+      });
+      setIsFormModalOpen(true);
+
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete("create");
+      nextParams.delete("product_id");
+      nextParams.delete("suggested_qty");
+      setSearchParams(nextParams, { replace: true });
+    }
+  }, [searchParams, products, reset, setSearchParams]);
 
   const { fields, append, remove } = useFieldArray({
     control,
@@ -164,6 +225,10 @@ export const Purchases: React.FC = () => {
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["purchases"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["posProducts"] });
+      queryClient.invalidateQueries({ queryKey: ["products-all"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-low-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["analytics-summary"] });
       queryClient.invalidateQueries({ queryKey: ["stock-movements"] });
       addToast({
         title: "Stock Received",
@@ -222,7 +287,14 @@ export const Purchases: React.FC = () => {
       supplier_id: "" as any,
       ref_no: `PO-${year}-${rand}`,
       notes: "",
-      items: [{ product_id: "" as any, qty: 10, unit_cost: 0 }],
+      items: [
+        {
+          product_id: "" as any,
+          product_variant_id: null,
+          qty: 10,
+          unit_cost: 0,
+        },
+      ],
     });
     setIsFormModalOpen(true);
   };
@@ -235,6 +307,7 @@ export const Purchases: React.FC = () => {
       notes: po.notes || "",
       items: (po.items || []).map((item) => ({
         product_id: item.product_id,
+        product_variant_id: item.product_variant_id ?? null,
         qty: item.qty,
         unit_cost: parseFloat(String(item.unit_cost)),
       })),
@@ -255,6 +328,9 @@ export const Purchases: React.FC = () => {
       notes: data.notes || null,
       items: data.items.map((i) => ({
         product_id: i.product_id,
+        ...(i.product_variant_id
+          ? { product_variant_id: i.product_variant_id }
+          : {}),
         qty: i.qty,
         unit_cost: i.unit_cost,
       })),
@@ -263,7 +339,35 @@ export const Purchases: React.FC = () => {
 
   const handleProductSelect = (index: number, productId: number) => {
     const prod = products.find((p) => p.id === productId);
-    if (prod && prod.cost_price) {
+    const activeVariants = (prod?.variants || []).filter(
+      (v) => v.is_active !== false,
+    );
+    if (activeVariants.length > 0 && activeVariants[0].id) {
+      const firstVariant = activeVariants[0];
+      setValue(`items.${index}.product_variant_id`, firstVariant.id ?? null);
+      const vCost = firstVariant.cost_price ?? prod?.cost_price;
+      if (vCost !== undefined && vCost !== null) {
+        setValue(`items.${index}.unit_cost`, parseFloat(String(vCost)));
+      }
+    } else {
+      setValue(`items.${index}.product_variant_id`, null);
+      if (prod && prod.cost_price) {
+        setValue(`items.${index}.unit_cost`, parseFloat(prod.cost_price));
+      }
+    }
+  };
+
+  const handleVariantSelect = (index: number, variantIdRaw: string) => {
+    const prodId = Number(watchedItems[index]?.product_id);
+    const prod = products.find((p) => p.id === prodId);
+    const vid = variantIdRaw ? Number(variantIdRaw) : null;
+    const matchedVar = prod?.variants?.find((v) => v.id === vid);
+    if (matchedVar && matchedVar.cost_price !== undefined) {
+      setValue(
+        `items.${index}.unit_cost`,
+        parseFloat(String(matchedVar.cost_price)),
+      );
+    } else if (prod && prod.cost_price) {
       setValue(`items.${index}.unit_cost`, parseFloat(prod.cost_price));
     }
   };
@@ -273,10 +377,10 @@ export const Purchases: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 tracking-tight">
+          <h2 className="text-xl font-bold text-[#292824] tracking-tight">
             Purchases & Stock-In
           </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <p className="text-xs text-[#88847D] mt-0.5">
             Procure inventory from suppliers, manage purchase orders, and
             receive shipments
           </p>
@@ -295,9 +399,9 @@ export const Purchases: React.FC = () => {
       </div>
 
       {/* Filter / Search Bar */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 bg-white p-3 rounded-lg border border-slate-200">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 bg-white p-3 rounded-[10px] border border-[#E8E3DA]">
         <div className="relative">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <Search className="w-4 h-4 text-[#88847D] absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             placeholder="Search by PO ref number..."
@@ -309,7 +413,7 @@ export const Purchases: React.FC = () => {
                 page: 1,
               }))
             }
-            className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[#4338CA] focus:bg-white"
+            className="w-full pl-9 pr-3 py-1.5 text-xs bg-[#F8F6F2] border border-[#E8E3DA] rounded-lg placeholder-[#88847D] text-[#292824] focus:outline-none focus:ring-1 focus:ring-[#795438] focus:bg-white"
           />
         </div>
 
@@ -322,7 +426,7 @@ export const Purchases: React.FC = () => {
               page: 1,
             }))
           }
-          className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#4338CA] focus:bg-white"
+          className="w-full px-3 py-1.5 text-xs bg-[#F8F6F2] border border-[#E8E3DA] rounded-lg text-[#292824] focus:outline-none focus:ring-1 focus:ring-[#795438] focus:bg-white"
         >
           <option value="">All Statuses</option>
           <option value="draft">Draft (Pending Receiving)</option>
@@ -338,7 +442,7 @@ export const Purchases: React.FC = () => {
               page: 1,
             }))
           }
-          className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#4338CA] focus:bg-white"
+          className="w-full px-3 py-1.5 text-xs bg-[#F8F6F2] border border-[#E8E3DA] rounded-lg text-[#292824] focus:outline-none focus:ring-1 focus:ring-[#795438] focus:bg-white"
         >
           <option value="">All Suppliers</option>
           {suppliers.map((s) => (
@@ -350,7 +454,7 @@ export const Purchases: React.FC = () => {
       </div>
 
       {/* Table Content */}
-      <div className="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-none">
+      <div className="bg-white rounded-[10px] border border-[#E8E3DA] overflow-hidden shadow-none">
         {isLoading ? (
           <TableSkeleton rows={6} columns={7} />
         ) : purchases.length === 0 ? (
@@ -360,13 +464,13 @@ export const Purchases: React.FC = () => {
               description="Create a purchase order to record inbound supplier shipments and increase stock."
               actionLabel={canManage ? "New Purchase" : undefined}
               onAction={openCreateModal}
-              icon={<Truck className="w-8 h-8 text-slate-400" />}
+              icon={<Truck className="w-8 h-8 text-[#A58B6F]" />}
             />
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-slate-700">
-              <thead className="bg-slate-50/75 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-semibold text-[11px]">
+            <table className="w-full text-left text-xs text-[#292824]">
+              <thead className="bg-[#F8F6F2] border-b border-[#E8E3DA] text-[#88847D] uppercase tracking-wider font-semibold text-[11px]">
                 <tr>
                   <th className="py-3 px-4">PO Reference</th>
                   <th className="py-3 px-4">Supplier</th>
@@ -377,24 +481,24 @@ export const Purchases: React.FC = () => {
                   <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200">
+              <tbody className="divide-y divide-[#E8E3DA]">
                 {purchases.map((po) => {
                   const isReceived = po.status === "received";
                   return (
                     <tr
                       key={po.id}
-                      className="hover:bg-slate-50/60 transition-colors"
+                      className="hover:bg-[#FAF8F4] transition-colors"
                     >
-                      <td className="py-3 px-4 font-mono font-semibold text-slate-900">
+                      <td className="py-3 px-4 font-mono font-semibold text-[#292824]">
                         {po.ref_no}
                       </td>
-                      <td className="py-3 px-4 font-medium text-slate-800">
+                      <td className="py-3 px-4 font-medium text-[#292824]">
                         {po.supplier?.name || "—"}
                       </td>
-                      <td className="py-3 px-4 text-center font-mono font-semibold text-slate-700">
+                      <td className="py-3 px-4 text-center font-mono font-semibold text-[#292824]">
                         {po.items_count ?? (po.items ? po.items.length : 0)}
                       </td>
-                      <td className="py-3 px-4 text-right font-mono font-bold text-slate-900">
+                      <td className="py-3 px-4 text-right font-mono font-bold text-[#292824]">
                         ${po.total}
                       </td>
                       <td className="py-3 px-4 text-center">
@@ -404,20 +508,20 @@ export const Purchases: React.FC = () => {
                           className={
                             isReceived
                               ? "font-bold"
-                              : "font-medium text-slate-600"
+                              : "font-medium text-[#88847D]"
                           }
                         >
                           {isReceived ? "Received" : "Draft"}
                         </Badge>
                       </td>
-                      <td className="py-3 px-4 text-slate-500">
+                      <td className="py-3 px-4 text-[#88847D]">
                         {new Date(po.created_at).toLocaleDateString()}
                       </td>
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <button
                             onClick={() => setViewingPurchase(po)}
-                            className="p-1.5 text-slate-500 hover:text-slate-900 rounded hover:bg-slate-100"
+                            className="p-1.5 text-[#88847D] hover:text-[#292824] rounded hover:bg-[#F3EDE6]"
                             title="View Purchase Details"
                           >
                             <Eye className="w-3.5 h-3.5" />
@@ -427,21 +531,21 @@ export const Purchases: React.FC = () => {
                             <>
                               <button
                                 onClick={() => openEditModal(po)}
-                                className="p-1.5 text-slate-500 hover:text-slate-900 rounded hover:bg-slate-100"
+                                className="p-1.5 text-[#88847D] hover:text-[#292824] rounded hover:bg-[#F3EDE6]"
                                 title="Edit Draft Purchase"
                               >
                                 <Edit2 className="w-3.5 h-3.5" />
                               </button>
                               <button
                                 onClick={() => setReceivingPurchase(po)}
-                                className="p-1.5 text-slate-700 hover:text-[#4338CA] rounded hover:bg-indigo-50 font-semibold"
+                                className="p-1.5 text-[#292824] hover:text-[#795438] rounded hover:bg-[#F3EDE6] font-semibold"
                                 title="Receive Stock In"
                               >
                                 <PackageCheck className="w-3.5 h-3.5" />
                               </button>
                               <button
                                 onClick={() => setDeletingPurchase(po)}
-                                className="p-1.5 text-slate-500 hover:text-slate-900 rounded hover:bg-slate-100"
+                                className="p-1.5 text-[#88847D] hover:text-[#292824] rounded hover:bg-[#F3EDE6]"
                                 title="Delete Draft"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
@@ -460,11 +564,19 @@ export const Purchases: React.FC = () => {
 
         {/* Pagination */}
         {meta && meta.last_page > 1 && (
-          <div className="border-t border-slate-200 px-4 py-3 flex items-center justify-between bg-slate-50 text-xs text-slate-600">
+          <div className="border-t border-[#E8E3DA] px-4 py-3 flex items-center justify-between bg-[#F8F6F2] text-xs text-[#88847D]">
             <div>
-              Showing <span className="font-semibold">{meta.from || 0}</span> to{" "}
-              <span className="font-semibold">{meta.to || 0}</span> of{" "}
-              <span className="font-semibold">{meta.total}</span> purchases
+              Showing{" "}
+              <span className="font-semibold text-[#292824]">
+                {meta.from || 0}
+              </span>{" "}
+              to{" "}
+              <span className="font-semibold text-[#292824]">
+                {meta.to || 0}
+              </span>{" "}
+              of{" "}
+              <span className="font-semibold text-[#292824]">{meta.total}</span>{" "}
+              purchases
             </div>
             <div className="flex items-center gap-1">
               <button
@@ -475,12 +587,12 @@ export const Purchases: React.FC = () => {
                     page: (prev.page || 1) - 1,
                   }))
                 }
-                className="p-1.5 rounded border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="p-1.5 rounded border border-[#E8E3DA] bg-white text-[#292824] hover:bg-[#F3EDE6] disabled:opacity-40 disabled:cursor-not-allowed"
                 aria-label="Previous page"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              <span className="px-2 font-medium">
+              <span className="px-2 font-medium text-[#292824]">
                 Page {meta.current_page} of {meta.last_page}
               </span>
               <button
@@ -491,7 +603,7 @@ export const Purchases: React.FC = () => {
                     page: (prev.page || 1) + 1,
                   }))
                 }
-                className="p-1.5 rounded border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="p-1.5 rounded border border-[#E8E3DA] bg-white text-[#292824] hover:bg-[#F3EDE6] disabled:opacity-40 disabled:cursor-not-allowed"
                 aria-label="Next page"
               >
                 <ChevronRight className="w-4 h-4" />
@@ -512,9 +624,9 @@ export const Purchases: React.FC = () => {
         maxWidth="2xl"
         footer={
           <div className="flex items-center justify-between w-full">
-            <div className="text-xs font-semibold text-slate-700">
+            <div className="text-xs font-semibold text-[#88847D]">
               Estimated Total:{" "}
-              <span className="font-mono text-base font-bold text-slate-900">
+              <span className="font-mono text-base font-bold text-[#292824]">
                 ${liveTotal.toFixed(2)}
               </span>
             </div>
@@ -570,7 +682,7 @@ export const Purchases: React.FC = () => {
           {/* Line Items Table */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-[#292824]">
                 Purchase Line Items ({fields.length})
               </label>
               <Button
@@ -578,7 +690,12 @@ export const Purchases: React.FC = () => {
                 variant="outline"
                 size="sm"
                 onClick={() =>
-                  append({ product_id: "" as any, qty: 10, unit_cost: 0 })
+                  append({
+                    product_id: "" as any,
+                    product_variant_id: null,
+                    qty: 10,
+                    unit_cost: 0,
+                  })
                 }
                 leftIcon={<Plus className="w-3.5 h-3.5" />}
               >
@@ -587,14 +704,14 @@ export const Purchases: React.FC = () => {
             </div>
 
             {errors.items?.root && (
-              <p className="text-xs text-slate-900 font-semibold mb-2">
+              <p className="text-xs text-[#292824] font-semibold mb-2">
                 {errors.items.root.message}
               </p>
             )}
 
-            <div className="border border-slate-200 rounded-lg overflow-hidden">
+            <div className="border border-[#E8E3DA] rounded-lg overflow-hidden">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
+                <thead className="bg-[#F8F6F2] border-b border-[#E8E3DA] text-[#88847D] font-semibold">
                   <tr>
                     <th className="py-2 px-3">Product</th>
                     <th className="py-2 px-3 w-28">Quantity</th>
@@ -603,17 +720,23 @@ export const Purchases: React.FC = () => {
                     <th className="py-2 px-2 text-center w-10"></th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200">
+                <tbody className="divide-y divide-[#E8E3DA]">
                   {fields.map((field, idx) => {
                     const rowQty = Number(watchedItems[idx]?.qty) || 0;
                     const rowCost = Number(watchedItems[idx]?.unit_cost) || 0;
                     const subtotal = (rowQty * rowCost).toFixed(2);
+                    const rowProduct = products.find(
+                      (p) => p.id === Number(watchedItems[idx]?.product_id),
+                    );
+                    const rowVariants = (rowProduct?.variants || []).filter(
+                      (v) => v.is_active !== false,
+                    );
 
                     return (
                       <tr key={field.id} className="bg-white">
-                        <td className="py-2 px-3">
+                        <td className="py-2 px-3 space-y-1">
                           <select
-                            className="w-full px-2 py-1.5 text-xs bg-white text-slate-900 border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-[#4338CA]"
+                            className="w-full px-2 py-1.5 text-xs bg-white text-[#292824] border border-[#DDD6CA] rounded focus:outline-none focus:ring-1 focus:ring-[#795438]"
                             {...register(`items.${idx}.product_id`, {
                               valueAsNumber: true,
                               onChange: (e) =>
@@ -630,8 +753,34 @@ export const Purchases: React.FC = () => {
                               </option>
                             ))}
                           </select>
+                          {rowVariants.length > 0 && (
+                            <select
+                              aria-label="Product variation"
+                              className="w-full px-2 py-1 text-[11px] bg-[#F8F6F2] text-[#292824] border border-[#DDD6CA] rounded focus:outline-none focus:ring-1 focus:ring-[#795438]"
+                              {...register(`items.${idx}.product_variant_id`, {
+                                onChange: (e) =>
+                                  handleVariantSelect(idx, e.target.value),
+                              })}
+                            >
+                              <option value="">Default / Base Stock</option>
+                              {rowVariants.map((v) => {
+                                const label =
+                                  v.label ||
+                                  v.name ||
+                                  [v.color, v.size, v.material, v.style]
+                                    .filter(Boolean)
+                                    .join(" / ") ||
+                                  v.sku;
+                                return (
+                                  <option key={v.id} value={v.id}>
+                                    Variation: {label} ({v.sku})
+                                  </option>
+                                );
+                              })}
+                            </select>
+                          )}
                           {errors.items?.[idx]?.product_id && (
-                            <span className="text-[10px] text-slate-900 font-bold block mt-0.5">
+                            <span className="text-[10px] text-[#292824] font-bold block mt-0.5">
                               {errors.items[idx]?.product_id?.message}
                             </span>
                           )}
@@ -640,7 +789,7 @@ export const Purchases: React.FC = () => {
                           <input
                             type="number"
                             min="1"
-                            className="w-full px-2 py-1.5 text-xs bg-white text-slate-900 border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-[#4338CA]"
+                            className="w-full px-2 py-1.5 text-xs bg-white text-[#292824] border border-[#DDD6CA] rounded focus:outline-none focus:ring-1 focus:ring-[#795438]"
                             {...register(`items.${idx}.qty`, {
                               valueAsNumber: true,
                             })}
@@ -651,13 +800,13 @@ export const Purchases: React.FC = () => {
                             type="number"
                             step="0.01"
                             min="0"
-                            className="w-full px-2 py-1.5 text-xs bg-white text-slate-900 border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-[#4338CA]"
+                            className="w-full px-2 py-1.5 text-xs bg-white text-[#292824] border border-[#DDD6CA] rounded focus:outline-none focus:ring-1 focus:ring-[#795438]"
                             {...register(`items.${idx}.unit_cost`, {
                               valueAsNumber: true,
                             })}
                           />
                         </td>
-                        <td className="py-2 px-3 text-right font-mono font-semibold text-slate-900">
+                        <td className="py-2 px-3 text-right font-mono font-semibold text-[#292824]">
                           ${subtotal}
                         </td>
                         <td className="py-2 px-2 text-center">
@@ -665,7 +814,7 @@ export const Purchases: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => remove(idx)}
-                              className="p-1 text-slate-400 hover:text-slate-800 rounded"
+                              className="p-1 text-[#88847D] hover:text-[#292824] rounded"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -680,13 +829,13 @@ export const Purchases: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-[#292824] mb-1.5">
               Internal Procurement Notes
             </label>
             <textarea
               rows={2}
               placeholder="Shipping instructions, invoice references, carrier details..."
-              className="w-full px-3 py-2 text-sm bg-white text-slate-900 border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#4338CA] focus:border-[#4338CA]"
+              className="w-full px-3 py-2 text-sm bg-white text-[#292824] border border-[#DDD6CA] rounded-lg focus:outline-none focus:ring-1 focus:ring-[#795438] focus:border-[#795438]"
               {...register("notes")}
             />
           </div>
@@ -702,7 +851,7 @@ export const Purchases: React.FC = () => {
           maxWidth="2xl"
           footer={
             <div className="flex items-center justify-between w-full">
-              <div className="text-xs text-slate-500">
+              <div className="text-xs text-[#88847D]">
                 Created: {new Date(viewingPurchase.created_at).toLocaleString()}
               </div>
               <div className="flex items-center gap-2">
@@ -730,45 +879,45 @@ export const Purchases: React.FC = () => {
           }
         >
           <div className="space-y-4">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 bg-[#F8F6F2] rounded-lg border border-[#E8E3DA] text-xs">
               <div>
-                <span className="text-slate-500 block">Supplier</span>
-                <span className="font-semibold text-slate-900">
+                <span className="text-[#88847D] block">Supplier</span>
+                <span className="font-semibold text-[#292824]">
                   {viewingPurchase.supplier?.name}
                 </span>
               </div>
               <div>
-                <span className="text-slate-500 block">Status</span>
-                <span className="font-bold text-slate-900 uppercase">
+                <span className="text-[#88847D] block">Status</span>
+                <span className="font-bold text-[#292824] uppercase">
                   {viewingPurchase.status}
                 </span>
               </div>
               <div>
-                <span className="text-slate-500 block">Received At</span>
-                <span className="font-medium text-slate-800">
+                <span className="text-[#88847D] block">Received At</span>
+                <span className="font-medium text-[#292824]">
                   {viewingPurchase.received_at
                     ? new Date(viewingPurchase.received_at).toLocaleDateString()
                     : "Not received"}
                 </span>
               </div>
               <div>
-                <span className="text-slate-500 block">Total Amount</span>
-                <span className="font-bold font-mono text-slate-900 text-sm">
+                <span className="text-[#88847D] block">Total Amount</span>
+                <span className="font-bold font-mono text-[#292824] text-sm">
                   ${viewingPurchase.total}
                 </span>
               </div>
             </div>
 
             {viewingPurchase.notes && (
-              <div className="text-xs p-3 bg-slate-50 rounded border border-slate-200 text-slate-700">
+              <div className="text-xs p-3 bg-[#F8F6F2] rounded border border-[#E8E3DA] text-[#292824]">
                 <span className="font-semibold block mb-0.5">Notes:</span>
                 {viewingPurchase.notes}
               </div>
             )}
 
-            <div className="border border-slate-200 rounded-lg overflow-hidden">
+            <div className="border border-[#E8E3DA] rounded-lg overflow-hidden">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
+                <thead className="bg-[#F8F6F2] border-b border-[#E8E3DA] text-[#88847D] font-semibold">
                   <tr>
                     <th className="py-2 px-3">Item Description</th>
                     <th className="py-2 px-3 text-center">Qty</th>
@@ -776,19 +925,26 @@ export const Purchases: React.FC = () => {
                     <th className="py-2 px-3 text-right">Subtotal</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200">
+                <tbody className="divide-y divide-[#E8E3DA]">
                   {(viewingPurchase.items || []).map((item, idx) => (
                     <tr key={idx} className="bg-white">
-                      <td className="py-2 px-3 font-medium text-slate-900">
-                        {item.product?.sku} — {item.product?.name}
+                      <td className="py-2 px-3 font-medium text-[#292824]">
+                        <div>
+                          {item.product?.sku} — {item.product?.name}
+                        </div>
+                        {item.variant_label && (
+                          <div className="text-[10px] font-medium text-[#795438] mt-0.5">
+                            {item.variant_label}
+                          </div>
+                        )}
                       </td>
-                      <td className="py-2 px-3 text-center font-mono font-semibold">
+                      <td className="py-2 px-3 text-center font-mono font-semibold text-[#292824]">
                         {item.qty}
                       </td>
-                      <td className="py-2 px-3 text-right font-mono">
+                      <td className="py-2 px-3 text-right font-mono text-[#88847D]">
                         ${item.unit_cost}
                       </td>
-                      <td className="py-2 px-3 text-right font-mono font-bold text-slate-900">
+                      <td className="py-2 px-3 text-right font-mono font-bold text-[#292824]">
                         $
                         {item.subtotal ||
                           (Number(item.qty) * Number(item.unit_cost)).toFixed(

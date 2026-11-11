@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Invoice;
 use App\Models\InvoiceCounter;
 use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Models\Sale;
 use App\Models\SaleItem;
 use App\Models\StockMovement;
@@ -30,7 +31,7 @@ class SaleService
         // 1. Idempotency Check
         if ($idempotencyKey) {
             $existingSale = Sale::where('idempotency_key', $idempotencyKey)
-                ->with(['items.product.unit', 'customer', 'invoice', 'user'])
+                ->with(['items.product.unit', 'items.variant', 'customer', 'invoice', 'user'])
                 ->first();
 
             if ($existingSale) {
@@ -46,10 +47,13 @@ class SaleService
             ]);
         }
 
-        // 3. Merge duplicate product lines
+        // 3. Merge duplicate product + variant lines
         $mergedItems = [];
         foreach ($rawItems as $raw) {
             $pid = (int) $raw['product_id'];
+            $variantId = isset($raw['product_variant_id']) && $raw['product_variant_id'] !== null && $raw['product_variant_id'] !== ''
+                ? (int) $raw['product_variant_id']
+                : null;
             $qty = (int) $raw['qty'];
 
             if ($qty <= 0) {
@@ -58,45 +62,58 @@ class SaleService
                 ]);
             }
 
-            if (! isset($mergedItems[$pid])) {
-                $mergedItems[$pid] = [
+            $key = "{$pid}:".($variantId ?? 0);
+
+            if (! isset($mergedItems[$key])) {
+                $mergedItems[$key] = [
                     'product_id' => $pid,
+                    'product_variant_id' => $variantId,
                     'qty' => $qty,
                     'custom_price' => isset($raw['unit_price']) ? (float) $raw['unit_price'] : null,
                 ];
             } else {
-                $mergedItems[$pid]['qty'] += $qty;
+                $mergedItems[$key]['qty'] += $qty;
                 if (isset($raw['unit_price'])) {
-                    $mergedItems[$pid]['custom_price'] = (float) $raw['unit_price'];
+                    $mergedItems[$key]['custom_price'] = (float) $raw['unit_price'];
                 }
             }
         }
 
-        // 4. Sort product IDs ascending to prevent deadlocks
-        $productIds = array_keys($mergedItems);
-        sort($productIds, SORT_NUMERIC);
+        // 4. Sort product and variant IDs ascending to prevent deadlocks
+        $productIds = collect($mergedItems)->pluck('product_id')->unique()->sort()->values()->all();
+        $variantIds = collect($mergedItems)->pluck('product_variant_id')->filter()->unique()->sort()->values()->all();
 
-        return DB::transaction(function () use ($data, $user, $idempotencyKey, $mergedItems, $productIds) {
+        return DB::transaction(function () use ($data, $user, $idempotencyKey, $mergedItems, $productIds, $variantIds) {
             // Check idempotency again within transaction
             if ($idempotencyKey) {
                 $existing = Sale::where('idempotency_key', $idempotencyKey)->lockForUpdate()->first();
                 if ($existing) {
-                    return $existing->load(['items.product.unit', 'customer', 'invoice', 'user']);
+                    return $existing->load(['items.product.unit', 'items.variant', 'customer', 'invoice', 'user']);
                 }
             }
 
-            // Lock products in ascending ID order
+            // Lock products (and variants if any) in ascending ID order
             $lockedProducts = Product::whereIn('id', $productIds)
                 ->orderBy('id', 'asc')
                 ->lockForUpdate()
                 ->get()
                 ->keyBy('id');
 
-            // Verify each product exists, is active, and has sufficient stock
+            $lockedVariants = ! empty($variantIds)
+                ? ProductVariant::whereIn('id', $variantIds)
+                    ->orderBy('id', 'asc')
+                    ->lockForUpdate()
+                    ->get()
+                    ->keyBy('id')
+                : collect();
+
+            // Verify each product/variant exists, is active, and has sufficient stock
             $lineItemsToCreate = [];
             $subtotal = 0.00;
 
-            foreach ($mergedItems as $pid => $itemData) {
+            foreach ($mergedItems as $itemData) {
+                $pid = $itemData['product_id'];
+                $vid = $itemData['product_variant_id'];
                 /** @var Product|null $product */
                 $product = $lockedProducts->get($pid);
 
@@ -113,7 +130,47 @@ class SaleService
                 }
 
                 $requestedQty = $itemData['qty'];
-                if ($product->stock_qty < $requestedQty) {
+                /** @var ProductVariant|null $variant */
+                $variant = null;
+
+                if ($vid !== null) {
+                    $variant = $lockedVariants->get($vid);
+                    if (! $variant || (int) $variant->product_id !== (int) $product->id) {
+                        throw ValidationException::withMessages([
+                            'items' => ["Selected variation for '{$product->name}' is invalid."],
+                        ]);
+                    }
+                    if (! $variant->is_active) {
+                        throw ValidationException::withMessages([
+                            'items' => ["Variation '{$variant->label()}' for '{$product->name}' is inactive."],
+                        ]);
+                    }
+                    if ($variant->stock_qty < $requestedQty) {
+                        throw ValidationException::withMessages([
+                            'items' => [
+                                "Insufficient stock for '{$product->name}' [{$variant->label()}] ({$variant->sku}). Requested: {$requestedQty}, Available: {$variant->stock_qty}.",
+                            ],
+                        ]);
+                    }
+                } elseif ($product->has_variants) {
+                    $hasActiveVariants = ProductVariant::where('product_id', $product->id)
+                        ->where('is_active', true)
+                        ->exists();
+
+                    if ($hasActiveVariants) {
+                        throw ValidationException::withMessages([
+                            'items' => ["Please select a variation for '{$product->name}'."],
+                        ]);
+                    }
+
+                    if ($product->stock_qty < $requestedQty) {
+                        throw ValidationException::withMessages([
+                            'items' => [
+                                "Insufficient stock for '{$product->name}' ({$product->sku}). Requested: {$requestedQty}, Available: {$product->stock_qty}.",
+                            ],
+                        ]);
+                    }
+                } elseif ($product->stock_qty < $requestedQty) {
                     throw ValidationException::withMessages([
                         'items' => [
                             "Insufficient stock for '{$product->name}' ({$product->sku}). Requested: {$requestedQty}, Available: {$product->stock_qty}.",
@@ -121,21 +178,31 @@ class SaleService
                     ]);
                 }
 
+                $baseSellPrice = $variant ? (float) $variant->sell_price : (float) $product->sell_price;
+
                 // Determine unit price: Managers/Admins can override; Cashiers cannot
                 $isManagerOrAdmin = $user->isAdmin() || $user->isManager();
                 if ($isManagerOrAdmin && $itemData['custom_price'] !== null && $itemData['custom_price'] >= 0) {
                     $unitPrice = round($itemData['custom_price'], 2);
                 } else {
-                    $unitPrice = round((float) $product->sell_price, 2);
+                    $unitPrice = round($baseSellPrice, 2);
                 }
 
                 $lineTotal = round($unitPrice * $requestedQty, 2);
                 $subtotal += $lineTotal;
 
-                $avgCost = (float) ($product->avg_cost > 0 ? $product->avg_cost : $product->cost_price);
+                if ($variant) {
+                    $avgCost = (float) ($variant->avg_cost > 0
+                        ? $variant->avg_cost
+                        : ($variant->cost_price > 0 ? $variant->cost_price : ($product->avg_cost > 0 ? $product->avg_cost : $product->cost_price)));
+                } else {
+                    $avgCost = (float) ($product->avg_cost > 0 ? $product->avg_cost : $product->cost_price);
+                }
 
                 $lineItemsToCreate[] = [
                     'product' => $product,
+                    'variant' => $variant,
+                    'variant_label' => $variant?->label(),
                     'qty' => $requestedQty,
                     'unit_price' => $unitPrice,
                     'unit_cost' => $avgCost,
@@ -227,6 +294,8 @@ class SaleService
                 SaleItem::create([
                     'sale_id' => $sale->id,
                     'product_id' => $item['product']->id,
+                    'product_variant_id' => $item['variant']?->id,
+                    'variant_label' => $item['variant_label'],
                     'qty' => $item['qty'],
                     'unit_price' => $item['unit_price'],
                     'unit_cost' => $item['unit_cost'],
@@ -241,7 +310,8 @@ class SaleService
                     unitCost: $item['unit_cost'],
                     user: $user,
                     reference: $sale,
-                    reason: "Sale {$invoiceNumber}"
+                    reason: "Sale {$invoiceNumber}",
+                    variant: $item['variant']
                 );
             }
 
@@ -253,7 +323,9 @@ class SaleService
                 'pdf_path' => null,
             ]);
 
-            return $sale->load(['items.product.unit', 'customer', 'invoice', 'user']);
+            app(AnalyticsService::class)->invalidateCache();
+
+            return $sale->load(['items.product.unit', 'items.variant', 'customer', 'invoice', 'user']);
         });
     }
 
@@ -272,7 +344,7 @@ class SaleService
         return DB::transaction(function () use ($sale, $trimmedReason, $user) {
             /** @var Sale $lockedSale */
             $lockedSale = Sale::where('id', $sale->id)
-                ->with(['items.product', 'invoice'])
+                ->with(['items.product', 'items.variant', 'invoice'])
                 ->lockForUpdate()
                 ->firstOrFail();
 
@@ -284,13 +356,24 @@ class SaleService
                 throw new InvalidArgumentException('Only completed sales can be voided.');
             }
 
-            // Lock products in ascending ID order to avoid deadlocks
+            // Lock products (and variants if present) in ascending ID order to avoid deadlocks
             $productIds = $lockedSale->items->pluck('product_id')->unique()->sort()->values()->toArray();
-            $lockedProducts = Product::whereIn('id', $productIds)
+            $lockedProducts = Product::withTrashed()
+                ->whereIn('id', $productIds)
                 ->orderBy('id', 'asc')
                 ->lockForUpdate()
                 ->get()
                 ->keyBy('id');
+
+            $variantIds = $lockedSale->items->pluck('product_variant_id')->filter()->unique()->sort()->values()->toArray();
+            $lockedVariants = ! empty($variantIds)
+                ? ProductVariant::withTrashed()
+                    ->whereIn('id', $variantIds)
+                    ->orderBy('id', 'asc')
+                    ->lockForUpdate()
+                    ->get()
+                    ->keyBy('id')
+                : collect();
 
             $invoiceNo = $lockedSale->invoice?->number ?? "ID-{$lockedSale->id}";
 
@@ -298,6 +381,7 @@ class SaleService
             foreach ($lockedSale->items as $item) {
                 /** @var Product $product */
                 $product = $lockedProducts->get($item->product_id);
+                $variant = $item->product_variant_id ? $lockedVariants->get($item->product_variant_id) : null;
 
                 $this->stockService->record(
                     product: $product,
@@ -306,7 +390,8 @@ class SaleService
                     unitCost: (float) $item->unit_cost,
                     user: $user,
                     reference: $lockedSale,
-                    reason: "Void sale {$invoiceNo}: {$trimmedReason}"
+                    reason: "Void sale {$invoiceNo}: {$trimmedReason}",
+                    variant: $variant
                 );
             }
 
@@ -316,7 +401,20 @@ class SaleService
             $lockedSale->void_reason = $trimmedReason;
             $lockedSale->save();
 
-            return $lockedSale->load(['items.product.unit', 'customer', 'invoice', 'user', 'voidedByUser']);
+            app(AnalyticsService::class)->invalidateCache();
+            app(AuditLogService::class)->log(
+                action: 'voided',
+                entity: 'Sale',
+                entityId: $lockedSale->id,
+                changes: [
+                    'reason' => $trimmedReason,
+                    'total' => (float) $lockedSale->total,
+                    'invoice' => $invoiceNo,
+                ],
+                user: $user
+            );
+
+            return $lockedSale->load(['items.product.unit', 'items.variant', 'customer', 'invoice', 'user', 'voidedByUser']);
         });
     }
 }

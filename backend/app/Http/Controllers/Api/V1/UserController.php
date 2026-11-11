@@ -7,6 +7,7 @@ use App\Http\Requests\User\UserStoreRequest;
 use App\Http\Requests\User\UserUpdateRequest;
 use App\Http\Resources\UserResource;
 use App\Models\User;
+use App\Services\AuditLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -45,6 +46,14 @@ class UserController extends Controller
         $data = $request->validated();
         $user = User::create($data);
 
+        app(AuditLogService::class)->log(
+            action: 'created',
+            entity: 'User',
+            entityId: $user->id,
+            changes: ['name' => $user->name, 'email' => $user->email, 'role' => $user->role],
+            user: $request->user()
+        );
+
         return response()->json([
             'message' => 'User created successfully',
             'data' => new UserResource($user),
@@ -70,6 +79,14 @@ class UserController extends Controller
 
         $user->update($data);
 
+        app(AuditLogService::class)->log(
+            action: 'updated',
+            entity: 'User',
+            entityId: $user->id,
+            changes: ['name' => $user->name, 'email' => $user->email, 'role' => $user->role],
+            user: $request->user()
+        );
+
         return response()->json([
             'message' => 'User updated successfully',
             'data' => new UserResource($user),
@@ -90,6 +107,14 @@ class UserController extends Controller
         $user->save();
 
         $status = $user->is_active ? 'activated' : 'deactivated';
+
+        app(AuditLogService::class)->log(
+            action: $status,
+            entity: 'User',
+            entityId: $user->id,
+            changes: ['is_active' => $user->is_active],
+            user: auth()->user()
+        );
 
         return response()->json([
             'message' => "User {$status} successfully",

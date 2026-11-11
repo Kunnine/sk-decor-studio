@@ -162,10 +162,10 @@ export const Suppliers: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 tracking-tight">
+          <h2 className="text-xl font-bold text-[#292824] tracking-tight">
             Suppliers
           </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <p className="text-xs text-[#88847D] mt-0.5">
             Manage vendor profiles, contact details, and procurement partners
           </p>
         </div>
@@ -183,9 +183,9 @@ export const Suppliers: React.FC = () => {
       </div>
 
       {/* Filter / Search Bar */}
-      <div className="flex items-center gap-3 bg-white p-3 rounded-lg border border-slate-200">
+      <div className="flex items-center gap-3 bg-white p-3 rounded-lg border border-[#E8E3DA]">
         <div className="relative flex-1">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <Search className="w-4 h-4 text-[#A58B6F] absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             placeholder="Search suppliers by name, phone, or email..."
@@ -194,13 +194,13 @@ export const Suppliers: React.FC = () => {
               setSearch(e.target.value);
               setPage(1);
             }}
-            className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[#4338CA] focus:bg-white"
+            className="w-full pl-9 pr-3 py-1.5 text-xs bg-[#FAF8F4] border border-[#E8E3DA] rounded-lg text-[#292824] placeholder-[#88847D] focus:outline-none focus:ring-1 focus:ring-[#795438] focus:bg-white"
           />
         </div>
       </div>
 
       {/* Table Content */}
-      <div className="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-none">
+      <div className="bg-white rounded-lg border border-[#E8E3DA] overflow-hidden shadow-none">
         {isLoading ? (
           <TableSkeleton rows={6} columns={5} />
         ) : suppliers.length === 0 ? (
@@ -214,13 +214,13 @@ export const Suppliers: React.FC = () => {
               }
               actionLabel={canManage && !search ? "Add Supplier" : undefined}
               onAction={openCreateModal}
-              icon={<Truck className="w-8 h-8 text-slate-400" />}
+              icon={<Truck className="w-8 h-8 text-[#A58B6F]" />}
             />
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-slate-700">
-              <thead className="bg-slate-50/75 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-semibold text-[11px]">
+            <table className="w-full text-left text-xs text-[#292824]">
+              <thead className="bg-[#FAF8F4] border-b border-[#E8E3DA] text-[#88847D] uppercase tracking-wider font-semibold text-[11px]">
                 <tr>
                   <th className="py-3 px-4">Supplier Name</th>
                   <th className="py-3 px-4">Contact Phone</th>
@@ -232,40 +232,40 @@ export const Suppliers: React.FC = () => {
                   )}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200">
+              <tbody className="divide-y divide-[#F0ECE4]">
                 {suppliers.map((sup) => (
                   <tr
                     key={sup.id}
-                    className="hover:bg-slate-50/60 transition-colors"
+                    className="hover:bg-[#FAF8F4]/70 transition-colors"
                   >
-                    <td className="py-3 px-4 font-semibold text-slate-900">
+                    <td className="py-3 px-4 font-semibold text-[#292824]">
                       {sup.name}
                     </td>
-                    <td className="py-3 px-4 text-slate-600">
+                    <td className="py-3 px-4 text-[#88847D]">
                       {sup.phone ? (
                         <span className="flex items-center gap-1 font-mono">
-                          <Phone className="w-3 h-3 text-slate-400" />
+                          <Phone className="w-3 h-3 text-[#A58B6F]" />
                           {sup.phone}
                         </span>
                       ) : (
                         "—"
                       )}
                     </td>
-                    <td className="py-3 px-4 text-slate-600">
+                    <td className="py-3 px-4 text-[#88847D]">
                       {sup.email ? (
                         <span className="flex items-center gap-1">
-                          <Mail className="w-3 h-3 text-slate-400" />
+                          <Mail className="w-3 h-3 text-[#A58B6F]" />
                           {sup.email}
                         </span>
                       ) : (
                         "—"
                       )}
                     </td>
-                    <td className="py-3 px-4 text-slate-500 max-w-xs truncate">
+                    <td className="py-3 px-4 text-[#88847D] max-w-xs truncate">
                       {sup.address || "—"}
                     </td>
                     <td className="py-3 px-4 text-center">
-                      <span className="font-semibold font-mono text-slate-900">
+                      <span className="font-semibold font-mono text-[#292824]">
                         {sup.purchases_count ?? 0}
                       </span>
                     </td>
@@ -274,14 +274,14 @@ export const Suppliers: React.FC = () => {
                         <div className="flex items-center justify-end gap-1">
                           <button
                             onClick={() => openEditModal(sup)}
-                            className="p-1.5 text-slate-500 hover:text-slate-900 rounded hover:bg-slate-100 transition-colors"
+                            className="p-1.5 text-[#88847D] hover:text-[#795438] rounded hover:bg-[#F3EDE6] transition-colors"
                             title="Edit Supplier"
                           >
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => setDeletingSupplier(sup)}
-                            className="p-1.5 text-slate-500 hover:text-slate-900 rounded hover:bg-slate-100 transition-colors"
+                            className="p-1.5 text-[#88847D] hover:text-[#292824] rounded hover:bg-[#F3EDE6] transition-colors"
                             title="Delete Supplier"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -298,28 +298,28 @@ export const Suppliers: React.FC = () => {
 
         {/* Pagination */}
         {meta && meta.last_page > 1 && (
-          <div className="border-t border-slate-200 px-4 py-3 flex items-center justify-between bg-slate-50 text-xs text-slate-600">
+          <div className="border-t border-[#E8E3DA] px-4 py-3 flex items-center justify-between bg-[#FAF8F4] text-xs text-[#88847D]">
             <div>
-              Showing <span className="font-semibold">{meta.from || 0}</span> to{" "}
-              <span className="font-semibold">{meta.to || 0}</span> of{" "}
-              <span className="font-semibold">{meta.total}</span> suppliers
+              Showing <span className="font-semibold text-[#292824]">{meta.from || 0}</span> to{" "}
+              <span className="font-semibold text-[#292824]">{meta.to || 0}</span> of{" "}
+              <span className="font-semibold text-[#292824]">{meta.total}</span> suppliers
             </div>
             <div className="flex items-center gap-1">
               <button
                 disabled={meta.current_page <= 1}
                 onClick={() => setPage(meta.current_page - 1)}
-                className="p-1.5 rounded border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="p-1.5 rounded border border-[#DDD6CA] bg-white text-[#292824] hover:bg-[#F3EDE6] disabled:opacity-40 disabled:cursor-not-allowed"
                 aria-label="Previous page"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              <span className="px-2 font-medium">
+              <span className="px-2 font-medium text-[#292824]">
                 Page {meta.current_page} of {meta.last_page}
               </span>
               <button
                 disabled={meta.current_page >= meta.last_page}
                 onClick={() => setPage(meta.current_page + 1)}
-                className="p-1.5 rounded border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="p-1.5 rounded border border-[#DDD6CA] bg-white text-[#292824] hover:bg-[#F3EDE6] disabled:opacity-40 disabled:cursor-not-allowed"
                 aria-label="Next page"
               >
                 <ChevronRight className="w-4 h-4" />
@@ -354,7 +354,7 @@ export const Suppliers: React.FC = () => {
         <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-4">
           <Input
             label="Company / Vendor Name"
-            placeholder="e.g. Apex Hardware Distribution"
+            placeholder="e.g. Lumiere Artisanal Lighting"
             required
             error={errors.name?.message}
             {...register("name")}
@@ -378,13 +378,13 @@ export const Suppliers: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-[#292824] mb-1.5">
               Physical / Billing Address
             </label>
             <textarea
               rows={3}
               placeholder="Street address, city, state, postal code..."
-              className="w-full px-3 py-2 text-sm bg-white text-slate-900 border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#4338CA] focus:border-[#4338CA]"
+              className="w-full px-3 py-2 text-sm bg-white text-[#292824] border border-[#DDD6CA] rounded-lg focus:outline-none focus:ring-1 focus:ring-[#795438] focus:border-[#795438]"
               {...register("address")}
             />
           </div>

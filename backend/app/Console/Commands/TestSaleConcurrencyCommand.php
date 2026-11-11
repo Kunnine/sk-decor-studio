@@ -2,9 +2,11 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Category;
 use App\Models\Product;
 use App\Models\Sale;
 use App\Models\StockMovement;
+use App\Models\Unit;
 use App\Models\User;
 use App\Services\SaleService;
 use Illuminate\Console\Command;
@@ -41,13 +43,22 @@ class TestSaleConcurrencyCommand extends Command
         for ($i = 1; $i <= $runs; $i++) {
             $this->line("--- Run {$i}/{$runs} ---");
 
+            $categoryId = Category::query()->value('id');
+            $unitId = Unit::query()->value('id');
+
+            if (! $categoryId || ! $unitId) {
+                $this->error('No category or unit found in database.');
+
+                return 1;
+            }
+
             // Create or reset a unique product with exactly 1 in stock
-            $product = DB::transaction(function () {
+            $product = DB::transaction(function () use ($categoryId, $unitId, $user) {
                 $p = Product::create([
                     'sku' => 'CONCURRENCY-'.uniqid(),
                     'name' => 'Concurrency Target Product',
-                    'category_id' => 1,
-                    'unit_id' => 1,
+                    'category_id' => $categoryId,
+                    'unit_id' => $unitId,
                     'cost_price' => 10.00,
                     'sell_price' => 15.00,
                     'stock_qty' => 1,
@@ -62,7 +73,7 @@ class TestSaleConcurrencyCommand extends Command
                     'qty_change' => 1,
                     'unit_cost' => 10.00,
                     'reason' => 'Initial concurrency stock setup',
-                    'user_id' => 1,
+                    'user_id' => $user->id,
                     'created_at' => now(),
                 ]);
 
@@ -74,8 +85,8 @@ class TestSaleConcurrencyCommand extends Command
             $cmd2 = [PHP_BINARY, 'artisan', 'test:concurrency', '--worker', "--product-id={$product->id}", "--user-id={$user->id}"];
 
             $env = [
-                'DB_CONNECTION' => config('database.default', 'mysql'),
-                'DB_DATABASE' => config('database.connections.mysql.database', 'inventory_system'),
+                'DB_CONNECTION' => 'mysql',
+                'DB_DATABASE' => config('database.connections.mysql.database', 'inventory_db'),
             ];
 
             $process1 = new Process($cmd1, base_path(), $env);

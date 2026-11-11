@@ -14,6 +14,7 @@ export interface SaleFilters {
 
 export interface SaleItemInput {
   product_id: number;
+  product_variant_id?: number | null;
   qty: number;
   unit_price?: number;
 }

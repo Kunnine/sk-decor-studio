@@ -1,0 +1,47 @@
+config:
+  target: "http://127.0.0.1:8000"
+  phases:
+    - duration: 30
+      arrivalRate: 5
+      rampTo: 50
+      name: "Ramp up to 50 concurrent POS cashiers"
+    - duration: 60
+      arrivalRate: 50
+      name: "Sustain 50 concurrent POS cashiers"
+  defaults:
+    headers:
+      Accept: "application/json"
+      Content-Type: "application/json"
+scenarios:
+  - name: "POS Product Search and Checkout Journey"
+    flow:
+      # Step 1: Cashier Login
+      - post:
+          url: "/api/v1/login"
+          json:
+            email: "cashier@inventory.test"
+            password: "Password123!"
+          capture:
+            - json: "$.token"
+              as: "authToken"
+      # Step 2: Search products in POS terminal
+      - get:
+          url: "/api/v1/products/pos/search?q=Widget"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          capture:
+            - json: "$.data[0].id"
+              as: "firstProductId"
+      # Step 3: Complete POS Sale transaction
+      - post:
+          url: "/api/v1/sales"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          json:
+            customer_id: null
+            payment_method: "cash"
+            amount_paid: 1000.00
+            notes: "Artillery load test sale"
+            items:
+              - product_id: "{{ firstProductId }}"
+                qty: 1

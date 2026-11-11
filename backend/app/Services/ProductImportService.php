@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Category;
 use App\Models\Product;
+use App\Models\Supplier;
 use App\Models\Unit;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
@@ -150,6 +151,11 @@ class ProductImportService
                 'description' => $row['description'] ?? null,
                 'category_name' => $categoryName,
                 'unit_name' => $unitName ?: null,
+                'supplier_name' => ! empty($row['supplier']) ? trim($row['supplier']) : null,
+                'color' => ! empty($row['color']) ? trim($row['color']) : null,
+                'size' => ! empty($row['size']) ? trim($row['size']) : null,
+                'material' => ! empty($row['material']) ? trim($row['material']) : null,
+                'style' => ! empty($row['style']) ? trim($row['style']) : null,
                 'cost_price' => $costPrice,
                 'sell_price' => $sellPrice,
                 'stock_qty' => $stockQty,
@@ -208,15 +214,26 @@ class ProductImportService
             &$skippedCount
         ) {
             foreach ($rows as $row) {
-                // 1. Resolve Category
+                // 1. Resolve Category (supports both "Subcategory" and "Parent > Subcategory")
                 $catName = $row['category_name'];
-                $category = Category::whereRaw('LOWER(name) = ?', [strtolower($catName)])->first();
+                $category = null;
+                if (str_contains($catName, '>')) {
+                    [$parentPart, $childPart] = array_map('trim', explode('>', $catName, 2));
+                    $parentCat = Category::whereNull('parent_id')->whereRaw('LOWER(name) = ?', [strtolower($parentPart)])->first();
+                    if ($parentCat && $childPart !== '') {
+                        $category = Category::where('parent_id', $parentCat->id)->whereRaw('LOWER(name) = ?', [strtolower($childPart)])->first();
+                    }
+                }
+                if (! $category) {
+                    $category = Category::whereRaw('LOWER(name) = ?', [strtolower($catName)])->first();
+                }
 
                 if (! $category) {
                     if ($createMissingCategories) {
+                        $cleanName = str_contains($catName, '>') ? trim(explode('>', $catName, 2)[1]) : $catName;
                         $category = Category::create([
-                            'name' => $catName,
-                            'slug' => Str::slug($catName).'-'.Str::random(4),
+                            'name' => $cleanName,
+                            'slug' => Str::slug($cleanName).'-'.Str::random(4),
                         ]);
                     } else {
                         $skippedCount++;
@@ -239,6 +256,12 @@ class ProductImportService
                     }
                 }
 
+                // Optional Supplier lookup
+                $supplier = null;
+                if (! empty($row['supplier_name'])) {
+                    $supplier = Supplier::whereRaw('LOWER(name) = ?', [strtolower($row['supplier_name'])])->first();
+                }
+
                 // 3. Handle Product
                 $existing = Product::where('sku', $row['sku'])->first();
 
@@ -249,6 +272,11 @@ class ProductImportService
                             'description' => $row['description'] ?? $existing->description,
                             'category_id' => $category->id,
                             'unit_id' => $unit?->id ?? $existing->unit_id,
+                            'supplier_id' => $supplier?->id ?? $existing->supplier_id,
+                            'color' => $row['color'] ?? $existing->color,
+                            'size' => $row['size'] ?? $existing->size,
+                            'material' => $row['material'] ?? $existing->material,
+                            'style' => $row['style'] ?? $existing->style,
                             'cost_price' => $row['cost_price'],
                             'sell_price' => $row['sell_price'],
                             'reorder_level' => $row['reorder_level'],
@@ -264,6 +292,11 @@ class ProductImportService
                         'description' => $row['description'],
                         'category_id' => $category->id,
                         'unit_id' => $unit?->id,
+                        'supplier_id' => $supplier?->id,
+                        'color' => $row['color'] ?? null,
+                        'size' => $row['size'] ?? null,
+                        'material' => $row['material'] ?? null,
+                        'style' => $row['style'] ?? null,
                         'cost_price' => $row['cost_price'],
                         'sell_price' => $row['sell_price'],
                         'stock_qty' => $row['stock_qty'],
@@ -290,11 +323,11 @@ class ProductImportService
      */
     public function getTemplateCsv(): string
     {
-        $headers = ['sku', 'name', 'description', 'category', 'unit', 'cost_price', 'sell_price', 'stock_qty', 'reorder_level'];
+        $headers = ['sku', 'name', 'description', 'category', 'unit', 'cost_price', 'sell_price', 'stock_qty', 'reorder_level', 'supplier', 'color', 'size', 'material', 'style'];
         $sampleRows = [
-            ['SKU-LAP-001', 'Dell XPS 15 Laptop', '15-inch 4K OLED, 32GB RAM, 1TB SSD', 'Laptops', 'Piece', '1200.00', '1599.99', '15', '5'],
-            ['SKU-MSE-002', 'Logitech MX Master 3S', 'Wireless ergonomic mouse, Bluetooth', 'Keyboards & Mice', 'Piece', '60.00', '99.99', '40', '10'],
-            ['SKU-DSK-003', 'Adjustable Standing Desk', 'Electric dual-motor standing desk 60x30', 'Desks', 'Piece', '250.00', '399.00', '8', '3'],
+            ['LMP-MOD-TBL', 'Modern LED Table Lamp', 'Warm dimmable LED table lamp with brushed metal base', 'Table Lamps', 'Piece', '42.00', '89.00', '20', '5', 'Lumiere Lighting Studio', 'Black', 'Medium', 'Metal', 'Modern'],
+            ['WAL-MIN-ART', 'Minimalist Wall Art', 'Textured abstract canvas wall art framed in oak', 'Wall Art', 'Piece', '45.00', '95.00', '14', '4', 'Nordic Home Atelier', 'Beige', 'Large', 'Fabric', 'Minimalist'],
+            ['VAS-CER-DEC', 'Ceramic Decorative Vase', 'Matte handcrafted stoneware flower vase', 'Ceramic Vases', 'Piece', '24.00', '54.00', '18', '5', 'Botanica & Clay Living', 'White', 'Medium', 'Ceramic', 'Nordic'],
         ];
 
         $output = fopen('php://temp', 'r+');

@@ -19,12 +19,12 @@ export const Badge: React.FC<BadgeProps> = ({
   };
 
   const variantStyles = {
-    neutral: "bg-slate-100 text-slate-800 border border-slate-200 font-medium",
+    neutral: "bg-slate-100 text-[#292824] border border-[#E8E3DA] font-medium",
     primary:
-      "bg-[#EEF2FF] text-[#4338CA] border border-indigo-200 font-semibold",
+      "bg-[#F3EDE6] text-[#795438] border border-[#DFD2C5] font-semibold",
     warning: "bg-[#FEF3C7] text-amber-900 border border-amber-300 font-bold", // Used for low stock warnings
     outline:
-      "bg-transparent text-slate-700 border border-slate-300 font-medium",
+      "bg-transparent text-[#88847D] border border-[#DDD6CA] font-medium",
   };
 
   return (

@@ -123,3 +123,59 @@ test('low stock endpoint returns only products at or below reorder level', funct
     $response->assertStatus(200)
         ->assertJsonCount(1, 'data');
 });
+
+test('admin can soft-delete product so it is excluded from active catalog listing', function () {
+    $admin = User::factory()->admin()->create();
+    $product = Product::factory()->create(['sku' => 'DEL-CAT-01']);
+
+    $this->actingAs($admin, 'sanctum')
+        ->deleteJson("/api/v1/products/{$product->id}")
+        ->assertStatus(200);
+
+    $this->actingAs($admin, 'sanctum')
+        ->getJson('/api/v1/products?search=DEL-CAT-01')
+        ->assertStatus(200)
+        ->assertJsonCount(0, 'data');
+
+    expect(Product::withTrashed()->find($product->id)?->trashed())->toBeTrue();
+});
+
+test('products listing returns all products deterministically across pages without duplicates', function () {
+    $manager = User::factory()->manager()->create();
+    $cat = Category::factory()->create();
+    $sharedTime = now();
+
+    $createdIds = [];
+    for ($i = 1; $i <= 18; $i++) {
+        $p = Product::factory()->create([
+            'sku' => sprintf('BATCH-%03d', $i),
+            'name' => sprintf('Batch Decor Piece %02d', $i),
+            'category_id' => $cat->id,
+            'created_at' => $sharedTime,
+            'updated_at' => $sharedTime,
+        ]);
+        $createdIds[] = $p->id;
+    }
+
+    $page1 = $this->actingAs($manager, 'sanctum')
+        ->getJson('/api/v1/products?per_page=10&page=1')
+        ->assertOk();
+    $page2 = $this->actingAs($manager, 'sanctum')
+        ->getJson('/api/v1/products?per_page=10&page=2')
+        ->assertOk();
+
+    $page1Ids = collect($page1->json('data'))->pluck('id')->all();
+    $page2Ids = collect($page2->json('data'))->pluck('id')->all();
+
+    expect(count($page1Ids))->toBe(10);
+    expect(count($page2Ids))->toBe(8);
+    expect(array_intersect($page1Ids, $page2Ids))->toBeEmpty();
+    expect(array_merge($page1Ids, $page2Ids))->toBe(array_reverse($createdIds));
+
+    // Requesting per_page=100 returns all 18 in one call
+    $all = $this->actingAs($manager, 'sanctum')
+        ->getJson('/api/v1/products?per_page=100')
+        ->assertOk();
+    expect($all->json('meta.total'))->toBe(18);
+    expect(count($all->json('data')))->toBe(18);
+});

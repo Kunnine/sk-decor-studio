@@ -35,4 +35,15 @@ export const authApi = {
     const res = await api.get<MeResponse>("/me");
     return res.data;
   },
+
+  updatePreferences: async (payload: {
+    email_alerts_enabled?: boolean | null;
+    digest_enabled?: boolean | null;
+  }): Promise<{ message: string; user: User }> => {
+    const res = await api.put<{ message: string; user: User }>(
+      "/me/preferences",
+      payload,
+    );
+    return res.data;
+  },
 };

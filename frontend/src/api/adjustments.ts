@@ -3,6 +3,7 @@ import { StockMovement } from "../types";
 
 export interface AdjustmentPayload {
   product_id: number;
+  product_variant_id?: number | null;
   delta: number;
   reason: string;
 }

@@ -75,4 +75,21 @@ class AuthController extends Controller
             'settings' => $settingService->all(),
         ]);
     }
+
+    public function updatePreferences(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'email_alerts_enabled' => ['nullable', 'boolean'],
+            'digest_enabled' => ['nullable', 'boolean'],
+        ]);
+
+        $user->update($validated);
+
+        return response()->json([
+            'message' => 'Notification preferences updated successfully',
+            'user' => new UserResource($user->fresh()),
+        ]);
+    }
 }

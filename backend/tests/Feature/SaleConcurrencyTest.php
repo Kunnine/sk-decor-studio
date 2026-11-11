@@ -5,7 +5,7 @@ use Symfony\Component\Process\Process;
 test('concurrency: selling the last unit twice simultaneously permits exactly one sale and prevents overselling', function () {
     $env = [
         'DB_CONNECTION' => 'mysql',
-        'DB_DATABASE' => 'inventory_system',
+        'DB_DATABASE' => 'inventory_db',
     ];
 
     $process = new Process([PHP_BINARY, 'artisan', 'test:concurrency', '--runs=1'], base_path(), $env);

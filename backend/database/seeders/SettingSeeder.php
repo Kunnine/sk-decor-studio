@@ -11,10 +11,16 @@ class SettingSeeder extends Seeder
     public function run(): void
     {
         foreach (SettingService::DEFAULTS as $key => $value) {
-            Setting::updateOrCreate(
-                ['key' => $key],
-                ['value' => $value]
-            );
+            $existing = Setting::where('key', $key)->first();
+
+            if (! $existing) {
+                Setting::create([
+                    'key' => $key,
+                    'value' => $value,
+                ]);
+            } elseif ($key === 'business_name' && $existing->value === 'Apex Retail Solutions') {
+                $existing->update(['value' => $value]);
+            }
         }
     }
 }

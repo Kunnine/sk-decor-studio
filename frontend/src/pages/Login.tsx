@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Lock, Mail, ArrowRight, ShieldCheck, AlertCircle } from "lucide-react";
+import { ArrowRight, AlertCircle, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
@@ -20,11 +20,11 @@ export const Login: React.FC = () => {
   const navigate = useNavigate();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const {
     register,
     handleSubmit,
-    setValue,
     formState: { errors },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -51,33 +51,27 @@ export const Login: React.FC = () => {
     }
   };
 
-  const handleDemoFill = (roleEmail: string) => {
-    setValue("email", roleEmail);
-    setValue("password", "Password123!");
-    setErrorMessage(null);
-  };
-
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[#F8F6F2] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center">
-          <div className="w-12 h-12 rounded-lg bg-[#4338CA] text-white flex items-center justify-center font-bold text-xl">
-            IS
+          <div className="w-12 h-12 rounded-xl bg-[#795438] text-white flex items-center justify-center font-bold text-lg tracking-wide">
+            MD
           </div>
         </div>
-        <h2 className="mt-4 text-center text-xl font-bold tracking-tight text-slate-900">
+        <h2 className="mt-4 text-center text-xl font-bold tracking-tight text-[#292824]">
           Sign in to your account
         </h2>
-        <p className="mt-1 text-center text-xs text-slate-500">
-          Inventory & Sales Management Platform
+        <p className="mt-1 text-center text-xs text-[#88847D]">
+          Maison Decor Studio — Interior Home Decoration Management
         </p>
       </div>
 
       <div className="mt-6 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-6 border border-slate-200 rounded-lg sm:px-10">
+        <div className="bg-white py-8 px-6 border border-[#E8E3DA] rounded-xl sm:px-10">
           {errorMessage && (
-            <div className="mb-5 p-3 rounded-lg border border-slate-800 bg-slate-50 flex items-start gap-2.5 text-slate-900 text-xs">
-              <AlertCircle className="w-4 h-4 text-slate-900 shrink-0 mt-0.5" />
+            <div className="mb-5 p-3 rounded-lg border border-[#292824] bg-[#F8F6F2] flex items-start gap-2.5 text-[#292824] text-xs">
+              <AlertCircle className="w-4 h-4 text-[#795438] shrink-0 mt-0.5" />
               <div className="font-semibold leading-relaxed">
                 {errorMessage}
               </div>
@@ -89,17 +83,34 @@ export const Login: React.FC = () => {
               label="Email address"
               type="email"
               autoComplete="email"
-              placeholder="user@inventory.test"
+              placeholder="e.g. user@example.com"
+              required
               error={errors.email?.message}
               {...register("email")}
             />
 
             <Input
               label="Password"
-              type="password"
+              type={showPassword ? "text" : "password"}
               autoComplete="current-password"
-              placeholder="••••••••••••"
+              placeholder="Enter your password"
+              required
               error={errors.password?.message}
+              rightElement={
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="p-1 rounded text-[#88847D] hover:text-[#292824] focus:outline-none focus:ring-1 focus:ring-[#795438]"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  title={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </button>
+              }
               {...register("password")}
             />
 
@@ -113,36 +124,6 @@ export const Login: React.FC = () => {
               Sign in
             </Button>
           </form>
-
-          {/* Quick Demo Fill Buttons */}
-          <div className="mt-6 pt-5 border-t border-slate-200">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 text-center mb-3">
-              One-click demo credentials
-            </p>
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => handleDemoFill("admin@inventory.test")}
-                className="py-1.5 px-2 text-xs font-semibold rounded border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-800 text-center transition-colors"
-              >
-                Admin
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDemoFill("manager@inventory.test")}
-                className="py-1.5 px-2 text-xs font-semibold rounded border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-800 text-center transition-colors"
-              >
-                Manager
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDemoFill("cashier@inventory.test")}
-                className="py-1.5 px-2 text-xs font-semibold rounded border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-800 text-center transition-colors"
-              >
-                Cashier
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     </div>

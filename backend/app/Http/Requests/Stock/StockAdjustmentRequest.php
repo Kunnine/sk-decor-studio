@@ -16,6 +16,7 @@ class StockAdjustmentRequest extends FormRequest
     {
         return [
             'product_id' => ['required', 'integer', 'exists:products,id'],
+            'product_variant_id' => ['nullable', 'integer', 'exists:product_variants,id'],
             'delta' => ['required', 'integer', 'not_in:0'],
             'reason' => ['required', 'string', 'min:3', 'max:255'],
         ];

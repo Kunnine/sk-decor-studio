@@ -23,6 +23,7 @@ class InvoiceService
     {
         $invoice->load([
             'sale.items.product.unit',
+            'sale.items.variant',
             'sale.customer',
             'sale.user',
             'sale.voidedByUser',

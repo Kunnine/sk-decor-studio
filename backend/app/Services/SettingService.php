@@ -12,7 +12,7 @@ class SettingService
     public const CACHE_KEY = 'app_settings_cache';
 
     public const DEFAULTS = [
-        'business_name' => 'Apex Retail Solutions',
+        'business_name' => 'Maison Decor Studio',
         'business_logo' => null,
         'currency_code' => 'USD',
         'currency_symbol' => '$',
@@ -20,6 +20,10 @@ class SettingService
         'default_reorder_level' => '10',
         'invoice_prefix' => 'INV',
         'date_format' => 'YYYY-MM-DD',
+        'digest_time' => '08:00',
+        'low_stock_email_alerts' => '1',
+        'low_stock_digest' => '1',
+        'slow_moving_days' => '60',
     ];
 
     /**

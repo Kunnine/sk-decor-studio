@@ -4,6 +4,7 @@ import {
   CsvImportPreview,
   PaginatedResponse,
   Product,
+  ProductVariant,
 } from "../types";
 
 export interface ProductFilters {
@@ -11,7 +12,16 @@ export interface ProductFilters {
   per_page?: number;
   search?: string;
   category_id?: number | "";
+  parent_category_id?: number | "";
+  supplier_id?: number | "";
   unit_id?: number | "";
+  min_price?: number | string;
+  max_price?: number | string;
+  stock_status?: "" | "in_stock" | "low_stock" | "out_of_stock";
+  color?: string;
+  size?: string;
+  material?: string;
+  style?: string;
   is_active?: boolean | string;
   low_stock?: boolean;
   sort_by?: string;
@@ -24,10 +34,17 @@ export interface ProductPayload {
   description?: string | null;
   category_id: number;
   unit_id?: number | null;
+  supplier_id?: number | null;
   cost_price: number;
   sell_price: number;
   stock_qty?: number;
   reorder_level?: number;
+  color?: string | null;
+  size?: string | null;
+  material?: string | null;
+  style?: string | null;
+  has_variants?: boolean;
+  variants?: ProductVariant[];
   is_active?: boolean;
   image?: File | null;
   remove_image?: boolean;
@@ -37,8 +54,17 @@ export const productApi = {
   list: async (
     params?: ProductFilters,
   ): Promise<PaginatedResponse<Product>> => {
+    const cleanParams = params
+      ? Object.fromEntries(
+          Object.entries(params).filter(
+            ([, value]) =>
+              value !== "" && value !== undefined && value !== null,
+          ),
+        )
+      : undefined;
+
     const res = await api.get<PaginatedResponse<Product>>("/products", {
-      params,
+      params: cleanParams,
     });
     return res.data;
   },
@@ -51,25 +77,43 @@ export const productApi = {
   create: async (
     payload: ProductPayload,
   ): Promise<{ message: string; data: Product }> => {
-    const formData = new FormData();
-    Object.entries(payload).forEach(([key, value]) => {
-      if (value !== undefined && value !== null) {
+    let body: any;
+    if (payload.image instanceof File) {
+      const formData = new FormData();
+      Object.entries(payload).forEach(([key, value]) => {
+        if (value === undefined || key === "remove_image") return;
         if (key === "image" && value instanceof File) {
           formData.append("image", value);
+        } else if (key === "variants" && Array.isArray(value)) {
+          formData.append("variants", JSON.stringify(value));
         } else if (typeof value === "boolean") {
           formData.append(key, value ? "1" : "0");
+        } else if (value === null) {
+          if (
+            [
+              "supplier_id",
+              "unit_id",
+              "color",
+              "size",
+              "material",
+              "style",
+              "description",
+            ].includes(key)
+          ) {
+            formData.append(key, "");
+          }
         } else {
           formData.append(key, String(value));
         }
-      }
-    });
+      });
+      body = formData;
+    } else {
+      body = payload;
+    }
 
     const res = await api.post<{ message: string; data: Product }>(
       "/products",
-      formData,
-      {
-        headers: { "Content-Type": "multipart/form-data" },
-      },
+      body,
     );
     return res.data;
   },
@@ -78,33 +122,64 @@ export const productApi = {
     id: number,
     payload: Partial<ProductPayload>,
   ): Promise<{ message: string; data: Product }> => {
-    const formData = new FormData();
-    formData.append("_method", "PUT");
+    let body: any;
+    if (payload.image instanceof File || payload.remove_image) {
+      const formData = new FormData();
+      formData.append("_method", "PUT");
 
-    Object.entries(payload).forEach(([key, value]) => {
-      if (value !== undefined && value !== null) {
+      Object.entries(payload).forEach(([key, value]) => {
+        if (value === undefined) return;
         if (key === "image" && value instanceof File) {
           formData.append("image", value);
+        } else if (key === "variants" && Array.isArray(value)) {
+          formData.append("variants", JSON.stringify(value));
         } else if (typeof value === "boolean") {
           formData.append(key, value ? "1" : "0");
+        } else if (value === null) {
+          if (
+            [
+              "supplier_id",
+              "unit_id",
+              "color",
+              "size",
+              "material",
+              "style",
+              "description",
+            ].includes(key)
+          ) {
+            formData.append(key, "");
+          }
         } else {
           formData.append(key, String(value));
         }
-      }
-    });
-
-    const res = await api.post<{ message: string; data: Product }>(
-      `/products/${id}`,
-      formData,
-      {
-        headers: { "Content-Type": "multipart/form-data" },
-      },
-    );
-    return res.data;
+      });
+      body = formData;
+      const res = await api.post<{ message: string; data: Product }>(
+        `/products/${id}`,
+        body,
+      );
+      return res.data;
+    } else {
+      const res = await api.put<{ message: string; data: Product }>(
+        `/products/${id}`,
+        payload,
+      );
+      return res.data;
+    }
   },
 
-  delete: async (id: number): Promise<{ message: string }> => {
-    const res = await api.delete<{ message: string }>(`/products/${id}`);
+  delete: async (
+    id: number,
+  ): Promise<{
+    message: string;
+    has_transaction_history?: boolean;
+    soft_deleted?: boolean;
+  }> => {
+    const res = await api.delete<{
+      message: string;
+      has_transaction_history?: boolean;
+      soft_deleted?: boolean;
+    }>(`/products/${id}`);
     return res.data;
   },
 
@@ -118,9 +193,6 @@ export const productApi = {
     const res = await api.post<{ message: string; data: Product }>(
       `/products/${id}/image`,
       formData,
-      {
-        headers: { "Content-Type": "multipart/form-data" },
-      },
     );
     return res.data;
   },
@@ -187,10 +259,28 @@ export const productApi = {
     });
   },
 
-  posSearch: async (q: string): Promise<Product[]> => {
+  posSearch: async (
+    q: string,
+    categoryId?: number | "",
+  ): Promise<Product[]> => {
     const res = await api.get<{ data: Product[] }>("/products/pos-search", {
-      params: { q },
+      params: {
+        q,
+        ...(categoryId ? { category_id: categoryId } : {}),
+      },
     });
     return res.data.data;
+  },
+
+  lowStock: async (params?: {
+    page?: number;
+    per_page?: number;
+  }): Promise<
+    PaginatedResponse<Product & { last_purchase_date?: string | null }>
+  > => {
+    const res = await api.get<
+      PaginatedResponse<Product & { last_purchase_date?: string | null }>
+    >("/products/low-stock", { params });
+    return res.data;
   },
 };

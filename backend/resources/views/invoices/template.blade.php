@@ -12,14 +12,14 @@
             font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
             font-size: 11px;
             line-height: 1.4;
-            color: #0F172A;
+            color: #292824;
             margin: 0;
             padding: 0;
         }
         .header {
             width: 100%;
             margin-bottom: 25px;
-            border-bottom: 1px solid #E2E8F0;
+            border-bottom: 1px solid #E8E3DA;
             padding-bottom: 15px;
         }
         .header-table {
@@ -28,7 +28,7 @@
         .business-name {
             font-size: 18px;
             font-weight: bold;
-            color: #4338CA;
+            color: #795438;
             margin: 0;
             text-transform: uppercase;
             letter-spacing: 0.5px;
@@ -36,14 +36,14 @@
         .invoice-title {
             font-size: 20px;
             font-weight: bold;
-            color: #0F172A;
+            color: #292824;
             text-align: right;
             margin: 0;
         }
         .invoice-meta {
             text-align: right;
             font-size: 11px;
-            color: #64748B;
+            color: #88847D;
         }
         .meta-section {
             width: 100%;
@@ -54,7 +54,7 @@
         }
         .meta-card {
             width: 48%;
-            border: 1px solid #E2E8F0;
+            border: 1px solid #E8E3DA;
             border-radius: 8px;
             padding: 10px 12px;
             vertical-align: top;
@@ -63,13 +63,13 @@
             font-size: 9px;
             font-weight: bold;
             text-transform: uppercase;
-            color: #64748B;
+            color: #88847D;
             letter-spacing: 0.5px;
             margin-bottom: 4px;
         }
         .meta-card-content {
             font-size: 11px;
-            color: #0F172A;
+            color: #292824;
         }
         .items-table {
             width: 100%;
@@ -77,10 +77,10 @@
             margin-bottom: 25px;
         }
         .items-table th {
-            background-color: #F8FAFC;
-            border-top: 1px solid #E2E8F0;
-            border-bottom: 1px solid #E2E8F0;
-            color: #64748B;
+            background-color: #FAF8F4;
+            border-top: 1px solid #E8E3DA;
+            border-bottom: 1px solid #E8E3DA;
+            color: #88847D;
             font-size: 10px;
             font-weight: bold;
             text-transform: uppercase;
@@ -90,7 +90,7 @@
         }
         .items-table td {
             padding: 8px 10px;
-            border-bottom: 1px solid #F1F5F9;
+            border-bottom: 1px solid #F0ECE4;
             font-size: 11px;
         }
         .items-table .text-right {
@@ -110,33 +110,33 @@
             font-size: 11px;
         }
         .summary-table .label {
-            color: #64748B;
+            color: #88847D;
         }
         .summary-table .value {
             text-align: right;
             font-weight: 600;
         }
         .total-row td {
-            border-top: 2px solid #E2E8F0;
-            border-bottom: 2px solid #E2E8F0;
+            border-top: 2px solid #E8E3DA;
+            border-bottom: 2px solid #E8E3DA;
             padding: 8px 8px;
             font-size: 13px;
             font-weight: bold;
-            color: #4338CA;
+            color: #795438;
         }
         .payment-info {
-            border: 1px solid #E2E8F0;
+            border: 1px solid #E8E3DA;
             border-radius: 8px;
             padding: 10px 14px;
             margin-bottom: 25px;
-            background-color: #F8FAFC;
+            background-color: #FAF8F4;
         }
         .payment-info table {
             width: 100%;
         }
         .payment-info td {
             font-size: 10px;
-            color: #475569;
+            color: #5C5852;
         }
         .watermark {
             position: fixed;
@@ -167,9 +167,9 @@
         .footer {
             margin-top: 30px;
             text-align: center;
-            color: #94A3B8;
+            color: #88847D;
             font-size: 9px;
-            border-top: 1px solid #E2E8F0;
+            border-top: 1px solid #E8E3DA;
             padding-top: 10px;
         }
     </style>
@@ -190,8 +190,8 @@
         <table class="header-table">
             <tr>
                 <td style="vertical-align: middle;">
-                    <div class="business-name">{{ $settings['business_name'] ?? 'Inventory & Sales System' }}</div>
-                    <div style="color: #64748B; font-size: 10px; margin-top: 2px;">Official Sales Receipt</div>
+                    <div class="business-name">{{ $settings['business_name'] ?? 'Maison Decor Studio' }}</div>
+                    <div style="color: #88847D; font-size: 10px; margin-top: 2px;">Official Home Decor Sales Receipt</div>
                 </td>
                 <td style="vertical-align: middle; text-align: right;">
                     <div class="invoice-title">INVOICE</div>
@@ -215,7 +215,7 @@
                             @if ($sale->customer->address) {{ $sale->customer->address }} @endif
                         @else
                             <strong>Walk-in Customer</strong><br>
-                            <span style="color: #64748B;">Direct retail checkout</span>
+                            <span style="color: #88847D;">Direct retail checkout</span>
                         @endif
                     </div>
                 </td>
@@ -245,10 +245,13 @@
         <tbody>
             @foreach ($sale->items as $index => $item)
                 <tr>
-                    <td style="color: #64748B;">{{ $index + 1 }}</td>
+                    <td style="color: #88847D;">{{ $index + 1 }}</td>
                     <td>
                         <strong>{{ $item->product?->name ?? 'Product' }}</strong><br>
-                        <span style="font-family: monospace; color: #64748B; font-size: 10px;">{{ $item->product?->sku }}</span>
+                        @if ($item->variant_label)
+                            <span style="color: #795438; font-size: 10px;">Variation: {{ $item->variant_label }}</span><br>
+                        @endif
+                        <span style="font-family: monospace; color: #88847D; font-size: 10px;">{{ $item->variant?->sku ?? $item->product?->sku }}</span>
                     </td>
                     <td class="text-right">
                         {{ $item->qty }} {{ $item->product?->unit?->short_name }}
@@ -283,8 +286,8 @@
                 </tr>
             @endif
             <tr class="total-row">
-                <td style="color: #4338CA;">TOTAL:</td>
-                <td class="value" style="color: #4338CA;">{{ $currencySymbol }}{{ number_format((float)$sale->total, 2) }}</td>
+                <td style="color: #795438;">TOTAL:</td>
+                <td class="value" style="color: #795438;">{{ $currencySymbol }}{{ number_format((float)$sale->total, 2) }}</td>
             </tr>
         </table>
     </div>
@@ -300,13 +303,13 @@
     </div>
 
     @if ($sale->notes)
-        <div style="font-size: 10px; color: #64748B; margin-bottom: 15px;">
+        <div style="font-size: 10px; color: #88847D; margin-bottom: 15px;">
             <strong>Notes:</strong> {{ $sale->notes }}
         </div>
     @endif
 
     <div class="footer">
-        Thank you for your business! Generated on {{ now()->format('Y-m-d H:i:s') }} &bull; {{ $settings['business_name'] ?? 'Inventory & Sales System' }}
+        Thank you for curating your space with us! Generated on {{ now()->format('Y-m-d H:i:s') }} &bull; {{ $settings['business_name'] ?? 'Maison Decor Studio' }}
     </div>
 </body>
 </html>

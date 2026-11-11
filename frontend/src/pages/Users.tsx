@@ -198,10 +198,10 @@ export const Users: React.FC = () => {
 
   if (!canManage) {
     return (
-      <div className="p-8 bg-white border border-slate-200 rounded-lg text-center max-w-md mx-auto my-12">
-        <AlertCircle className="w-8 h-8 text-slate-500 mx-auto mb-2" />
-        <h3 className="text-sm font-bold text-slate-900">Access Restricted</h3>
-        <p className="text-xs text-slate-500 mt-1">
+      <div className="p-8 bg-white border border-[#E8E3DA] rounded-lg text-center max-w-md mx-auto my-12">
+        <AlertCircle className="w-8 h-8 text-[#A58B6F] mx-auto mb-2" />
+        <h3 className="text-sm font-bold text-[#292824]">Access Restricted</h3>
+        <p className="text-xs text-[#88847D] mt-1">
           Only administrators have access to user accounts and permissions.
         </p>
       </div>
@@ -211,10 +211,10 @@ export const Users: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#E8E3DA] pb-4">
         <div>
-          <h1 className="text-xl font-bold text-slate-900">User Management</h1>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <h1 className="text-xl font-bold text-[#292824]">User Management</h1>
+          <p className="text-xs text-[#88847D] mt-0.5">
             Administer staff accounts, roles (Admin, Manager, Cashier), and
             account active status.
           </p>
@@ -232,10 +232,10 @@ export const Users: React.FC = () => {
       </div>
 
       {/* Filter bar */}
-      <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+      <div className="bg-white border border-[#E8E3DA] rounded-lg p-3 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
         <div className="flex flex-1 flex-col sm:flex-row items-center gap-3">
           <div className="relative flex-1 w-full">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-[#A58B6F] absolute left-3 top-1/2 -translate-y-1/2" />
             <Input
               value={search}
               onChange={(e) =>
@@ -288,7 +288,7 @@ export const Users: React.FC = () => {
                 page: "1",
               })
             }
-            className="text-xs text-slate-500 self-end md:self-auto"
+            className="text-xs text-[#88847D] self-end md:self-auto"
           >
             Clear Filters
           </Button>
@@ -296,14 +296,14 @@ export const Users: React.FC = () => {
       </div>
 
       {/* Table */}
-      <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
+      <div className="bg-white border border-[#E8E3DA] rounded-lg overflow-hidden">
         {isLoading ? (
           <div className="p-4">
             <TableSkeleton rows={5} columns={5} />
           </div>
         ) : users.length === 0 ? (
           <EmptyState
-            icon={<UsersIcon className="w-8 h-8 text-slate-500" />}
+            icon={<UsersIcon className="w-8 h-8 text-[#A58B6F]" />}
             title="No users found"
             description={
               search || roleFilter || statusFilter
@@ -316,7 +316,7 @@ export const Users: React.FC = () => {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold uppercase tracking-wider text-[11px]">
+              <thead className="bg-[#FAF8F4] border-b border-[#E8E3DA] text-[#88847D] font-semibold uppercase tracking-wider text-[11px]">
                 <tr>
                   <th className="py-3 px-4">User</th>
                   <th className="py-3 px-4">Role</th>
@@ -325,24 +325,24 @@ export const Users: React.FC = () => {
                   <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-[#F0ECE4]">
                 {users.map((u) => {
                   const isSelf = u.id === currentUser?.id;
                   return (
                     <tr
                       key={u.id}
-                      className="hover:bg-slate-50/70 transition-colors"
+                      className="hover:bg-[#FAF8F4]/70 transition-colors"
                     >
                       <td className="py-3 px-4">
-                        <div className="font-semibold text-slate-900 flex items-center gap-2">
+                        <div className="font-semibold text-[#292824] flex items-center gap-2">
                           <span>{u.name}</span>
                           {isSelf && (
-                            <span className="text-[10px] font-bold text-[#4338CA] bg-indigo-50 border border-indigo-200 px-1.5 py-0.2 rounded">
+                            <span className="text-[10px] font-bold text-[#795438] bg-[#F3EDE6] border border-[#DDD6CA] px-1.5 py-0.2 rounded">
                               You
                             </span>
                           )}
                         </div>
-                        <div className="text-[11px] text-slate-500">
+                        <div className="text-[11px] text-[#88847D]">
                           {u.email}
                         </div>
                       </td>
@@ -359,24 +359,24 @@ export const Users: React.FC = () => {
                         <span
                           className={`inline-flex items-center gap-1.5 text-xs font-semibold ${
                             u.is_active
-                              ? "text-slate-900 font-bold"
-                              : "text-slate-400"
+                              ? "text-[#292824] font-bold"
+                              : "text-[#88847D]"
                           }`}
                         >
                           {u.is_active ? (
                             <>
-                              <CheckCircle2 className="w-3.5 h-3.5 text-indigo-700" />
+                              <CheckCircle2 className="w-3.5 h-3.5 text-[#795438]" />
                               <span>Active</span>
                             </>
                           ) : (
                             <>
-                              <XCircle className="w-3.5 h-3.5 text-slate-400" />
+                              <XCircle className="w-3.5 h-3.5 text-[#A58B6F]" />
                               <span>Deactivated</span>
                             </>
                           )}
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-slate-500">
+                      <td className="py-3 px-4 text-[#88847D]">
                         {u.created_at
                           ? new Date(u.created_at).toLocaleDateString()
                           : "-"}
@@ -389,8 +389,8 @@ export const Users: React.FC = () => {
                             disabled={isSelf}
                             className={`p-1.5 rounded transition-colors ${
                               isSelf
-                                ? "opacity-30 cursor-not-allowed text-slate-400"
-                                : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                                ? "opacity-30 cursor-not-allowed text-[#88847D]"
+                                : "text-[#88847D] hover:text-[#292824] hover:bg-[#F3EDE6]"
                             }`}
                             title={
                               isSelf
@@ -401,16 +401,16 @@ export const Users: React.FC = () => {
                             }
                           >
                             {u.is_active ? (
-                              <ToggleRight className="w-4 h-4 text-indigo-700" />
+                              <ToggleRight className="w-4 h-4 text-[#795438]" />
                             ) : (
-                              <ToggleLeft className="w-4 h-4 text-slate-400" />
+                              <ToggleLeft className="w-4 h-4 text-[#A58B6F]" />
                             )}
                           </button>
 
                           {/* Edit user */}
                           <button
                             onClick={() => openEditModal(u)}
-                            className="p-1.5 rounded text-slate-600 hover:text-[#4338CA] hover:bg-slate-100 transition-colors"
+                            className="p-1.5 rounded text-[#88847D] hover:text-[#795438] hover:bg-[#F3EDE6] transition-colors"
                             title="Edit User"
                           >
                             <Edit2 className="w-3.5 h-3.5" />
@@ -427,13 +427,13 @@ export const Users: React.FC = () => {
 
         {/* Pagination */}
         {meta && meta.last_page > 1 && (
-          <div className="p-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-xs text-slate-600">
+          <div className="p-3 border-t border-[#E8E3DA] bg-[#FAF8F4] flex items-center justify-between text-xs text-[#88847D]">
             <div>
               Showing{" "}
-              <span className="font-semibold text-slate-900">{meta.from}</span>{" "}
-              to <span className="font-semibold text-slate-900">{meta.to}</span>{" "}
+              <span className="font-semibold text-[#292824]">{meta.from}</span>{" "}
+              to <span className="font-semibold text-[#292824]">{meta.to}</span>{" "}
               of{" "}
-              <span className="font-semibold text-slate-900">{meta.total}</span>{" "}
+              <span className="font-semibold text-[#292824]">{meta.total}</span>{" "}
               users
             </div>
             <div className="flex items-center gap-1">
@@ -447,7 +447,7 @@ export const Users: React.FC = () => {
               >
                 <ChevronLeft className="w-3.5 h-3.5" />
               </Button>
-              <span className="px-2 font-medium">
+              <span className="px-2 font-medium text-[#292824]">
                 Page {meta.current_page} of {meta.last_page}
               </span>
               <Button
@@ -475,7 +475,7 @@ export const Users: React.FC = () => {
       >
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
+            <label className="block text-xs font-semibold text-[#292824] mb-1">
               Full Name *
             </label>
             <Input
@@ -486,7 +486,7 @@ export const Users: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
+            <label className="block text-xs font-semibold text-[#292824] mb-1">
               Email Address *
             </label>
             <Input
@@ -498,7 +498,7 @@ export const Users: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
+            <label className="block text-xs font-semibold text-[#292824] mb-1">
               {editingUser
                 ? "Password (leave blank to keep current)"
                 : "Password *"}
@@ -512,7 +512,7 @@ export const Users: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
+            <label className="block text-xs font-semibold text-[#292824] mb-1">
               Role *
             </label>
             <Select
@@ -541,17 +541,17 @@ export const Users: React.FC = () => {
               type="checkbox"
               id="is_active_checkbox"
               {...register("is_active")}
-              className="rounded border-slate-300 text-[#4338CA] focus:ring-[#4338CA]"
+              className="rounded border-[#DDD6CA] accent-[#795438] text-[#795438] focus:ring-[#795438]"
             />
             <label
               htmlFor="is_active_checkbox"
-              className="text-xs font-medium text-slate-700"
+              className="text-xs font-medium text-[#292824]"
             >
               Account is active (allows user to sign in)
             </label>
           </div>
 
-          <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+          <div className="flex justify-end gap-2 pt-3 border-t border-[#F0ECE4]">
             <Button
               type="button"
               variant="outline"

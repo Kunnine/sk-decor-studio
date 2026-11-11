@@ -20,11 +20,17 @@ class Product extends Model
         'description',
         'category_id',
         'unit_id',
+        'supplier_id',
         'cost_price',
         'avg_cost',
         'sell_price',
         'stock_qty',
         'reorder_level',
+        'color',
+        'size',
+        'material',
+        'style',
+        'has_variants',
         'image_path',
         'thumb_path',
         'is_active',
@@ -37,6 +43,7 @@ class Product extends Model
         'sell_price' => 'decimal:2',
         'stock_qty' => 'integer',
         'reorder_level' => 'integer',
+        'has_variants' => 'boolean',
         'is_active' => 'boolean',
         'low_stock_notified_at' => 'datetime',
     ];
@@ -54,6 +61,16 @@ class Product extends Model
     public function unit(): BelongsTo
     {
         return $this->belongsTo(Unit::class);
+    }
+
+    public function supplier(): BelongsTo
+    {
+        return $this->belongsTo(Supplier::class);
+    }
+
+    public function variants(): HasMany
+    {
+        return $this->hasMany(ProductVariant::class)->orderBy('id');
     }
 
     public function movements(): HasMany
@@ -109,7 +126,19 @@ class Product extends Model
         return $query->where(function (Builder $q) use ($term) {
             $q->where('name', 'like', "%{$term}%")
                 ->orWhere('sku', 'like', "%{$term}%")
-                ->orWhere('description', 'like', "%{$term}%");
+                ->orWhere('description', 'like', "%{$term}%")
+                ->orWhere('color', 'like', "%{$term}%")
+                ->orWhere('size', 'like', "%{$term}%")
+                ->orWhere('material', 'like', "%{$term}%")
+                ->orWhere('style', 'like', "%{$term}%")
+                ->orWhereHas('variants', function (Builder $vq) use ($term) {
+                    $vq->where('sku', 'like', "%{$term}%")
+                        ->orWhere('name', 'like', "%{$term}%")
+                        ->orWhere('color', 'like', "%{$term}%")
+                        ->orWhere('size', 'like', "%{$term}%")
+                        ->orWhere('material', 'like', "%{$term}%")
+                        ->orWhere('style', 'like', "%{$term}%");
+                });
         });
     }
 }

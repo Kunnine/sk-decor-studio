@@ -9,7 +9,7 @@ export const Skeleton: React.FC<SkeletonProps> = ({
 }) => {
   return (
     <div
-      className={`animate-pulse rounded bg-slate-200/80 ${className}`}
+      className={`animate-pulse rounded bg-[#E8E3DA]/80 ${className}`}
       aria-hidden="true"
     />
   );
@@ -26,7 +26,7 @@ export const TableSkeleton: React.FC<{ rows?: number; columns?: number }> = ({
           <Skeleton key={i} className="h-4 flex-1" />
         ))}
       </div>
-      <div className="border-t border-slate-200 my-2" />
+      <div className="border-t border-[#E8E3DA] my-2" />
       {Array.from({ length: rows }).map((_, r) => (
         <div key={r} className="flex gap-4 items-center py-2">
           {Array.from({ length: columns }).map((_, c) => (

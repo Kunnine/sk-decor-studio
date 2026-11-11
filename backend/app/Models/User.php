@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\SettingService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -24,6 +25,8 @@ class User extends Authenticatable
         'password',
         'role',
         'is_active',
+        'email_alerts_enabled',
+        'digest_enabled',
     ];
 
     protected $hidden = [
@@ -37,6 +40,8 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_active' => 'boolean',
+            'email_alerts_enabled' => 'boolean',
+            'digest_enabled' => 'boolean',
         ];
     }
 
@@ -65,6 +70,24 @@ class User extends Authenticatable
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('is_active', true);
+    }
+
+    public function wantsLowStockEmail(): bool
+    {
+        if ($this->email_alerts_enabled !== null) {
+            return (bool) $this->email_alerts_enabled;
+        }
+
+        return (bool) app(SettingService::class)->get('low_stock_email_alerts', true);
+    }
+
+    public function wantsLowStockDigest(): bool
+    {
+        if ($this->digest_enabled !== null) {
+            return (bool) $this->digest_enabled;
+        }
+
+        return (bool) app(SettingService::class)->get('low_stock_digest', true);
     }
 
     /**
@@ -98,6 +121,10 @@ class User extends Authenticatable
                 'sales.create',
                 'sales.void',
                 'invoices.view',
+                'analytics.view',
+                'reports.view',
+                'audit.view',
+                'notifications.view',
             ],
             self::ROLE_MANAGER => [
                 'categories.view',
@@ -120,6 +147,9 @@ class User extends Authenticatable
                 'sales.create',
                 'sales.void',
                 'invoices.view',
+                'analytics.view',
+                'reports.view',
+                'notifications.view',
             ],
             self::ROLE_CASHIER => [
                 'categories.view',

@@ -70,7 +70,12 @@ export const Sales: React.FC = () => {
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["sales"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["posProducts"] });
+      queryClient.invalidateQueries({ queryKey: ["products-all"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-low-stock"] });
+      queryClient.invalidateQueries({ queryKey: ["analytics-summary"] });
       queryClient.invalidateQueries({ queryKey: ["stockMovements"] });
+      queryClient.invalidateQueries({ queryKey: ["stock-movements"] });
       setSelectedSale(res.data);
       setIsVoidModalOpen(false);
       setVoidReason("");
@@ -143,10 +148,10 @@ export const Sales: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+          <h1 className="text-2xl font-bold text-[#292824] tracking-tight">
             Sales Records
           </h1>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="text-sm text-[#88847D] mt-1">
             Browse transaction records, download stamped PDF invoices, and
             process authorized voids.
           </p>
@@ -154,11 +159,11 @@ export const Sales: React.FC = () => {
       </div>
 
       {/* Filter Bar */}
-      <div className="bg-white p-4 rounded-lg border border-slate-200 space-y-3">
+      <div className="bg-white p-4 rounded-[10px] border border-[#E8E3DA] space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Invoice Number Search */}
           <div className="relative">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-[#88847D] absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               placeholder="Search invoice number..."
@@ -166,7 +171,7 @@ export const Sales: React.FC = () => {
               onChange={(e) =>
                 handleFilterChange("invoice_number", e.target.value)
               }
-              className="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-1 focus:ring-[#4338CA]"
+              className="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-[#DDD6CA] bg-white text-[#292824] placeholder-[#88847D] focus:outline-none focus:ring-1 focus:ring-[#795438]"
             />
           </div>
 
@@ -175,7 +180,7 @@ export const Sales: React.FC = () => {
             <select
               value={status}
               onChange={(e) => handleFilterChange("status", e.target.value)}
-              className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-1 focus:ring-[#4338CA] bg-white text-slate-700"
+              className="w-full px-3 py-2 text-xs rounded-lg border border-[#DDD6CA] focus:outline-none focus:ring-1 focus:ring-[#795438] bg-white text-[#292824]"
             >
               <option value="">All Statuses</option>
               <option value="completed">Completed</option>
@@ -185,32 +190,32 @@ export const Sales: React.FC = () => {
 
           {/* Date From */}
           <div className="relative">
-            <Calendar className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Calendar className="w-4 h-4 text-[#88847D] absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="date"
               value={dateFrom}
               onChange={(e) => handleFilterChange("date_from", e.target.value)}
-              className="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-1 focus:ring-[#4338CA]"
+              className="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-[#DDD6CA] bg-white text-[#292824] focus:outline-none focus:ring-1 focus:ring-[#795438]"
             />
           </div>
 
           {/* Date To */}
           <div className="relative">
-            <Calendar className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Calendar className="w-4 h-4 text-[#88847D] absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="date"
               value={dateTo}
               onChange={(e) => handleFilterChange("date_to", e.target.value)}
-              className="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-1 focus:ring-[#4338CA]"
+              className="w-full pl-9 pr-3 py-2 text-xs rounded-lg border border-[#DDD6CA] bg-white text-[#292824] focus:outline-none focus:ring-1 focus:ring-[#795438]"
             />
           </div>
         </div>
 
         {(status || dateFrom || dateTo || invoiceSearch) && (
-          <div className="flex justify-end pt-2 border-t border-slate-100">
+          <div className="flex justify-end pt-2 border-t border-[#E8E3DA]">
             <button
               onClick={resetFilters}
-              className="text-xs text-slate-500 hover:text-slate-900 flex items-center gap-1 font-medium"
+              className="text-xs text-[#88847D] hover:text-[#292824] flex items-center gap-1 font-medium"
             >
               <RotateCcw className="w-3 h-3" />
               Reset Filters
@@ -220,7 +225,7 @@ export const Sales: React.FC = () => {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+      <div className="bg-white rounded-[10px] border border-[#E8E3DA] overflow-hidden">
         {isLoading ? (
           <div className="p-6 space-y-4">
             <Skeleton className="h-8 w-full" />
@@ -229,20 +234,20 @@ export const Sales: React.FC = () => {
             <Skeleton className="h-12 w-full" />
           </div>
         ) : isError ? (
-          <div className="p-8 text-center text-slate-600">
+          <div className="p-8 text-center text-[#88847D]">
             <AlertTriangle className="w-8 h-8 text-amber-500 mx-auto mb-2" />
             <p>Failed to load sales records.</p>
           </div>
         ) : !data?.data?.length ? (
           <EmptyState
-            icon={<Receipt className="w-8 h-8 text-slate-400" />}
+            icon={<Receipt className="w-8 h-8 text-[#A58B6F]" />}
             title="No sales found"
             description="No transactions match your current search criteria."
           />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 text-xs uppercase tracking-wider font-semibold">
+              <thead className="bg-[#F8F6F2] border-b border-[#E8E3DA] text-[#88847D] text-xs uppercase tracking-wider font-semibold">
                 <tr>
                   <th className="px-6 py-3">Invoice</th>
                   <th className="px-6 py-3">Date & Time</th>
@@ -254,42 +259,42 @@ export const Sales: React.FC = () => {
                   <th className="px-6 py-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-[#E8E3DA]">
                 {data.data.map((sale) => (
                   <tr
                     key={sale.id}
                     onClick={() => setSelectedSale(sale)}
-                    className="hover:bg-slate-50 cursor-pointer transition-colors"
+                    className="hover:bg-[#FAF8F4] cursor-pointer transition-colors"
                   >
                     <td className="px-6 py-3.5">
-                      <div className="font-mono font-bold text-slate-900 text-xs">
+                      <div className="font-mono font-bold text-[#292824] text-xs">
                         {sale.invoice?.number || `#${sale.id}`}
                       </div>
-                      <div className="text-[10px] text-slate-400">
+                      <div className="text-[10px] text-[#88847D]">
                         {sale.items?.length ?? 0} items
                       </div>
                     </td>
-                    <td className="px-6 py-3.5 text-xs text-slate-600 whitespace-nowrap">
+                    <td className="px-6 py-3.5 text-xs text-[#88847D] whitespace-nowrap">
                       {sale.sold_at
                         ? new Date(sale.sold_at).toLocaleString()
                         : "—"}
                     </td>
-                    <td className="px-6 py-3.5 text-xs text-slate-700">
+                    <td className="px-6 py-3.5 text-xs text-[#292824]">
                       {sale.customer ? (
-                        <span className="font-medium text-slate-900">
+                        <span className="font-medium text-[#292824]">
                           {sale.customer.name}
                         </span>
                       ) : (
-                        <span className="text-slate-400 italic">Walk-in</span>
+                        <span className="text-[#88847D] italic">Walk-in</span>
                       )}
                     </td>
-                    <td className="px-6 py-3.5 text-xs text-slate-600">
+                    <td className="px-6 py-3.5 text-xs text-[#88847D]">
                       {sale.cashier?.name || "Staff"}
                     </td>
-                    <td className="px-6 py-3.5 text-xs uppercase font-medium text-slate-600">
+                    <td className="px-6 py-3.5 text-xs uppercase font-medium text-[#88847D]">
                       {sale.payment_method}
                     </td>
-                    <td className="px-6 py-3.5 text-right font-bold text-slate-900 text-xs">
+                    <td className="px-6 py-3.5 text-right font-bold text-[#292824] text-xs">
                       {currencySymbol}
                       {sale.total}
                     </td>
@@ -310,7 +315,7 @@ export const Sales: React.FC = () => {
                       <div className="inline-flex items-center gap-1">
                         <button
                           onClick={() => setSelectedSale(sale)}
-                          className="p-1.5 text-slate-500 hover:text-[#4338CA] hover:bg-slate-100 rounded"
+                          className="p-1.5 text-[#88847D] hover:text-[#795438] hover:bg-[#F3EDE6] rounded"
                           title="View Details"
                         >
                           <FileText className="w-4 h-4" />
@@ -323,7 +328,7 @@ export const Sales: React.FC = () => {
                                 sale.invoice!.number,
                               )
                             }
-                            className="p-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded"
+                            className="p-1.5 text-[#88847D] hover:text-[#292824] hover:bg-[#F3EDE6] rounded"
                             title="Download PDF"
                           >
                             <Download className="w-4 h-4" />
@@ -340,7 +345,7 @@ export const Sales: React.FC = () => {
 
         {/* Pagination */}
         {data?.meta && data.meta.last_page > 1 && (
-          <div className="px-6 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-600">
+          <div className="px-6 py-3 bg-[#F8F6F2] border-t border-[#E8E3DA] flex items-center justify-between text-xs text-[#88847D]">
             <div>
               Showing {data.meta.from ?? 0} to {data.meta.to ?? 0} of{" "}
               {data.meta.total} records
@@ -354,7 +359,7 @@ export const Sales: React.FC = () => {
               >
                 Previous
               </Button>
-              <span className="font-semibold text-slate-700">
+              <span className="font-semibold text-[#292824]">
                 Page {page} of {data.meta.last_page}
               </span>
               <Button
@@ -401,32 +406,32 @@ export const Sales: React.FC = () => {
             )}
 
             {/* Meta Info Grid */}
-            <div className="grid grid-cols-2 gap-3 text-xs bg-slate-50 p-3 rounded-lg border border-slate-200">
+            <div className="grid grid-cols-2 gap-3 text-xs bg-[#F8F6F2] p-3 rounded-lg border border-[#E8E3DA]">
               <div>
-                <span className="text-slate-400 block">Date & Time</span>
-                <span className="font-semibold text-slate-800">
+                <span className="text-[#88847D] block">Date & Time</span>
+                <span className="font-semibold text-[#292824]">
                   {selectedSale.sold_at
                     ? new Date(selectedSale.sold_at).toLocaleString()
                     : "—"}
                 </span>
               </div>
               <div>
-                <span className="text-slate-400 block">Cashier</span>
-                <span className="font-semibold text-slate-800">
+                <span className="text-[#88847D] block">Cashier</span>
+                <span className="font-semibold text-[#292824]">
                   {selectedSale.cashier?.name || "Staff"}
                 </span>
               </div>
               <div>
-                <span className="text-slate-400 block">Customer</span>
-                <span className="font-semibold text-slate-800">
+                <span className="text-[#88847D] block">Customer</span>
+                <span className="font-semibold text-[#292824]">
                   {selectedSale.customer
                     ? selectedSale.customer.name
                     : "Walk-in Customer"}
                 </span>
               </div>
               <div>
-                <span className="text-slate-400 block">Payment Method</span>
-                <span className="font-semibold text-slate-800 uppercase">
+                <span className="text-[#88847D] block">Payment Method</span>
+                <span className="font-semibold text-[#292824] uppercase">
                   {selectedSale.payment_method}
                 </span>
               </div>
@@ -434,12 +439,12 @@ export const Sales: React.FC = () => {
 
             {/* Items Table */}
             <div>
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-[#88847D] mb-2">
                 Purchased Items ({selectedSale.items?.length ?? 0})
               </h4>
-              <div className="border border-slate-200 rounded-lg overflow-hidden">
+              <div className="border border-[#E8E3DA] rounded-lg overflow-hidden">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
+                  <thead className="bg-[#F8F6F2] border-b border-[#E8E3DA] text-[#88847D] font-semibold">
                     <tr>
                       <th className="px-3 py-2">Item</th>
                       <th className="px-3 py-2 text-center">Qty</th>
@@ -450,12 +455,12 @@ export const Sales: React.FC = () => {
                       <th className="px-3 py-2 text-right">Total</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-[#E8E3DA]">
                     {selectedSale.items?.map((item) => (
                       <tr key={item.id}>
                         <td className="px-3 py-2">
                           <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded border border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden shrink-0">
+                            <div className="w-8 h-8 rounded border border-[#E8E3DA] bg-[#F8F7F4] flex items-center justify-center overflow-hidden shrink-0">
                               {item.product?.thumb_url ? (
                                 <img
                                   src={item.product.thumb_url}
@@ -463,33 +468,38 @@ export const Sales: React.FC = () => {
                                   className="w-full h-full object-cover"
                                 />
                               ) : (
-                                <Package className="w-3.5 h-3.5 text-slate-300" />
+                                <Package className="w-3.5 h-3.5 text-[#C8C1B6]" />
                               )}
                             </div>
                             <div className="min-w-0">
-                              <div className="font-semibold text-slate-900 truncate max-w-xs">
+                              <div className="font-semibold text-[#292824] truncate max-w-xs">
                                 {item.product?.name}
                               </div>
-                              <div className="text-[10px] text-slate-400 font-mono">
-                                {item.product?.sku}
+                              {item.variant_label && (
+                                <div className="text-[10px] font-medium text-[#795438]">
+                                  {item.variant_label}
+                                </div>
+                              )}
+                              <div className="text-[10px] text-[#88847D] font-mono">
+                                {item.variant?.sku || item.product?.sku}
                               </div>
                             </div>
                           </div>
                         </td>
-                        <td className="px-3 py-2 text-center font-semibold">
+                        <td className="px-3 py-2 text-center font-semibold text-[#292824]">
                           {item.qty}
                         </td>
-                        <td className="px-3 py-2 text-right">
+                        <td className="px-3 py-2 text-right text-[#292824]">
                           {currencySymbol}
                           {item.unit_price}
                         </td>
                         {canViewCost && (
-                          <td className="px-3 py-2 text-right text-slate-400">
+                          <td className="px-3 py-2 text-right text-[#88847D]">
                             {currencySymbol}
                             {item.unit_cost || "0.00"}
                           </td>
                         )}
-                        <td className="px-3 py-2 text-right font-bold text-slate-900">
+                        <td className="px-3 py-2 text-right font-bold text-[#292824]">
                           {currencySymbol}
                           {item.line_total}
                         </td>
@@ -501,8 +511,8 @@ export const Sales: React.FC = () => {
             </div>
 
             {/* Totals Summary */}
-            <div className="space-y-1 text-xs border-t border-slate-200 pt-3">
-              <div className="flex justify-between text-slate-600">
+            <div className="space-y-1 text-xs border-t border-[#E8E3DA] pt-3">
+              <div className="flex justify-between text-[#88847D]">
                 <span>Subtotal:</span>
                 <span>
                   {currencySymbol}
@@ -519,7 +529,7 @@ export const Sales: React.FC = () => {
                 </div>
               )}
               {parseFloat(selectedSale.tax) > 0 && (
-                <div className="flex justify-between text-slate-600">
+                <div className="flex justify-between text-[#88847D]">
                   <span>Tax:</span>
                   <span>
                     {currencySymbol}
@@ -527,7 +537,7 @@ export const Sales: React.FC = () => {
                   </span>
                 </div>
               )}
-              <div className="flex justify-between font-bold text-sm text-[#4338CA] pt-1 border-t border-slate-200">
+              <div className="flex justify-between font-bold text-sm text-[#795438] pt-1 border-t border-[#E8E3DA]">
                 <span>Total:</span>
                 <span>
                   {currencySymbol}
@@ -535,7 +545,7 @@ export const Sales: React.FC = () => {
                 </span>
               </div>
               {selectedSale.payment_method === "cash" && (
-                <div className="flex justify-between text-slate-500 pt-1 text-[11px]">
+                <div className="flex justify-between text-[#88847D] pt-1 text-[11px]">
                   <span>
                     Paid: {currencySymbol}
                     {selectedSale.amount_paid}
@@ -549,7 +559,7 @@ export const Sales: React.FC = () => {
             </div>
 
             {/* Modal Actions */}
-            <div className="flex items-center justify-between pt-4 border-t border-slate-200">
+            <div className="flex items-center justify-between pt-4 border-t border-[#E8E3DA]">
               <div>
                 {canVoid && selectedSale.status === "completed" && (
                   <Button
@@ -614,13 +624,13 @@ export const Sales: React.FC = () => {
           </div>
 
           {voidError && (
-            <div className="p-2.5 bg-slate-900 text-white rounded-lg text-xs font-semibold">
+            <div className="p-2.5 bg-[#292824] text-white rounded-lg text-xs font-semibold">
               {voidError}
             </div>
           )}
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+            <label className="block text-xs font-semibold text-[#292824] uppercase tracking-wider mb-1">
               Mandatory Void Reason <span className="text-amber-600">*</span>
             </label>
             <textarea
@@ -629,11 +639,11 @@ export const Sales: React.FC = () => {
               placeholder="e.g. Customer returned items immediately, incorrect pricing, or payment failed."
               value={voidReason}
               onChange={(e) => setVoidReason(e.target.value)}
-              className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#4338CA]"
+              className="w-full px-3 py-2 text-sm rounded-lg border border-[#DDD6CA] bg-white text-[#292824] focus:outline-none focus:ring-2 focus:ring-[#795438]"
             />
           </div>
 
-          <div className="flex justify-end gap-2 pt-2 border-t border-slate-200">
+          <div className="flex justify-end gap-2 pt-2 border-t border-[#E8E3DA]">
             <Button
               type="button"
               variant="outline"

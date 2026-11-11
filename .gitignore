@@ -33,3 +33,7 @@ frontend/coverage/
 .idea/
 *.swp
 *.swo
+
+# Backups
+backups/
+!backups/.gitkeep

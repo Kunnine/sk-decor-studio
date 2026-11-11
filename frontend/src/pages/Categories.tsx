@@ -281,8 +281,8 @@ export const Categories: React.FC = () => {
     return (
       <div key={node.id} className="text-xs">
         <div
-          className={`group flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-50 transition-colors ${
-            depth > 0 ? "ml-6 border-l-2 border-slate-200 pl-3" : ""
+          className={`group flex items-center justify-between py-2 px-3 rounded-lg hover:bg-[#FAF8F4] transition-colors ${
+            depth > 0 ? "ml-6 border-l-2 border-[#E8E3DA] pl-3" : ""
           }`}
         >
           <div className="flex items-center gap-2 min-w-0">
@@ -290,7 +290,7 @@ export const Categories: React.FC = () => {
               <button
                 type="button"
                 onClick={() => toggleNode(node.id)}
-                className="p-1 rounded hover:bg-slate-200 text-slate-500"
+                className="p-1 rounded hover:bg-[#F3EDE6] text-[#88847D]"
                 aria-label="Toggle node"
               >
                 {isExpanded ? (
@@ -303,13 +303,13 @@ export const Categories: React.FC = () => {
               <div className="w-5" />
             )}
 
-            <Folder className="w-4 h-4 text-indigo-700 shrink-0" />
+            <Folder className="w-4 h-4 text-[#795438] shrink-0" />
 
             <div className="flex items-center gap-2 truncate">
-              <span className="font-semibold text-slate-900 truncate">
+              <span className="font-semibold text-[#292824] truncate">
                 {node.name}
               </span>
-              <span className="text-[11px] font-mono text-slate-400">
+              <span className="text-[11px] font-mono text-[#88847D]">
                 /{node.slug}
               </span>
               <Badge
@@ -326,28 +326,28 @@ export const Categories: React.FC = () => {
             <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
               <button
                 onClick={() => openCreateModal(node.id)}
-                className="p-1 rounded text-slate-500 hover:text-indigo-700 hover:bg-slate-100"
+                className="p-1 rounded text-[#88847D] hover:text-[#795438] hover:bg-[#F3EDE6]"
                 title="Add child category"
               >
                 <FolderPlus className="w-3.5 h-3.5" />
               </button>
               <button
                 onClick={() => openMoveModal(node)}
-                className="p-1 rounded text-slate-500 hover:text-indigo-700 hover:bg-slate-100"
+                className="p-1 rounded text-[#88847D] hover:text-[#795438] hover:bg-[#F3EDE6]"
                 title="Move category"
               >
                 <ArrowRightLeft className="w-3.5 h-3.5" />
               </button>
               <button
                 onClick={() => openEditModal(node)}
-                className="p-1 rounded text-slate-500 hover:text-indigo-700 hover:bg-slate-100"
+                className="p-1 rounded text-[#88847D] hover:text-[#795438] hover:bg-[#F3EDE6]"
                 title="Edit category"
               >
                 <Edit2 className="w-3.5 h-3.5" />
               </button>
               <button
                 onClick={() => setDeletingCategory(node)}
-                className="p-1 rounded text-slate-500 hover:text-slate-900 hover:bg-slate-100"
+                className="p-1 rounded text-[#88847D] hover:text-[#292824] hover:bg-[#F3EDE6]"
                 title={
                   canDelete
                     ? "Delete category"
@@ -372,26 +372,26 @@ export const Categories: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#E8E3DA] pb-4">
         <div>
-          <h1 className="text-xl font-bold text-slate-900">
-            Product Categories
+          <h1 className="text-xl font-bold text-[#292824]">
+            Decor Categories
           </h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Organize products in nested hierarchical categories with cycle
-            prevention and integrity guards.
+          <p className="text-xs text-[#88847D] mt-0.5">
+            Organize interior home decoration collections and subcategories cleanly
+            with hierarchy &amp; integrity guards.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
           {/* Switcher */}
-          <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-xs">
+          <div className="inline-flex rounded-lg border border-[#E8E3DA] bg-[#F8F6F2] p-0.5 text-xs">
             <button
               onClick={() => setViewMode("tree")}
               className={`flex items-center gap-1.5 px-3 py-1 rounded-md font-semibold transition-colors ${
                 viewMode === "tree"
-                  ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-500 hover:text-slate-900"
+                  ? "bg-white text-[#795438] shadow-xs"
+                  : "text-[#88847D] hover:text-[#292824]"
               }`}
             >
               <FolderTree className="w-3.5 h-3.5" />
@@ -401,8 +401,8 @@ export const Categories: React.FC = () => {
               onClick={() => setViewMode("flat")}
               className={`flex items-center gap-1.5 px-3 py-1 rounded-md font-semibold transition-colors ${
                 viewMode === "flat"
-                  ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-500 hover:text-slate-900"
+                  ? "bg-white text-[#795438] shadow-xs"
+                  : "text-[#88847D] hover:text-[#292824]"
               }`}
             >
               <List className="w-3.5 h-3.5" />
@@ -425,9 +425,9 @@ export const Categories: React.FC = () => {
       </div>
 
       {/* Filter / Search Bar */}
-      <div className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm flex items-center justify-between gap-3">
+      <div className="bg-white border border-[#E8E3DA] rounded-[10px] p-3 flex items-center justify-between gap-3">
         <div className="relative flex-1 max-w-sm">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <Search className="w-4 h-4 text-[#88847D] absolute left-3 top-1/2 -translate-y-1/2" />
           <Input
             value={search}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -440,7 +440,7 @@ export const Categories: React.FC = () => {
             variant="ghost"
             size="sm"
             onClick={() => setSearchTerm("")}
-            className="text-xs text-slate-500"
+            className="text-xs text-[#88847D]"
           >
             Clear Search
           </Button>
@@ -449,14 +449,14 @@ export const Categories: React.FC = () => {
 
       {/* Content */}
       {viewMode === "tree" ? (
-        <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-sm">
+        <div className="bg-white border border-[#E8E3DA] rounded-[10px] p-5">
           {loadingTree ? (
-            <div className="p-8 text-center text-xs text-slate-500">
+            <div className="p-8 text-center text-xs text-[#88847D]">
               Loading category hierarchy...
             </div>
           ) : treeCategories.length === 0 ? (
             <EmptyState
-              icon={<FolderTree className="w-8 h-8 text-slate-500" />}
+              icon={<FolderTree className="w-8 h-8 text-[#A58B6F]" />}
               title="No categories defined"
               description="Create root categories to structure your product catalog."
               actionLabel={canManage ? "Create Category" : undefined}
@@ -470,14 +470,14 @@ export const Categories: React.FC = () => {
         </div>
       ) : (
         /* Flat Table View */
-        <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
+        <div className="bg-white border border-[#E8E3DA] rounded-[10px] overflow-hidden">
           {loadingFlat ? (
             <div className="p-4">
               <TableSkeleton rows={5} columns={5} />
             </div>
           ) : allCategories.length === 0 ? (
             <EmptyState
-              icon={<Layers className="w-8 h-8 text-slate-500" />}
+              icon={<Layers className="w-8 h-8 text-[#A58B6F]" />}
               title="No categories found"
               description={
                 search
@@ -488,7 +488,7 @@ export const Categories: React.FC = () => {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold uppercase tracking-wider text-[11px]">
+                <thead className="bg-[#F8F6F2] border-b border-[#E8E3DA] text-[#88847D] font-semibold uppercase tracking-wider text-[11px]">
                   <tr>
                     <th className="py-3 px-4">Category Name</th>
                     <th className="py-3 px-4">Slug</th>
@@ -497,35 +497,35 @@ export const Categories: React.FC = () => {
                     <th className="py-3 px-4 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-[#E8E3DA]">
                   {allCategories.map((cat) => {
                     const productCount = cat.products_count ?? 0;
                     return (
                       <tr
                         key={cat.id}
-                        className="hover:bg-slate-50/70 transition-colors"
+                        className="hover:bg-[#FAF8F4] transition-colors"
                       >
-                        <td className="py-3 px-4 font-semibold text-slate-900 flex items-center gap-2">
-                          <Folder className="w-3.5 h-3.5 text-indigo-700" />
+                        <td className="py-3 px-4 font-semibold text-[#292824] flex items-center gap-2">
+                          <Folder className="w-3.5 h-3.5 text-[#795438]" />
                           <span>{cat.name}</span>
                         </td>
-                        <td className="py-3 px-4 font-mono text-slate-500 text-[11px]">
+                        <td className="py-3 px-4 font-mono text-[#88847D] text-[11px]">
                           {cat.slug}
                         </td>
-                        <td className="py-3 px-4 text-slate-600">
+                        <td className="py-3 px-4 text-[#292824]">
                           {cat.parent ? (
-                            <span className="bg-slate-100 px-2 py-0.5 rounded border border-slate-200 font-medium">
+                            <span className="bg-[#F8F6F2] px-2 py-0.5 rounded border border-[#E8E3DA] font-medium">
                               {cat.parent.name}
                             </span>
                           ) : (
-                            <span className="text-slate-400 font-medium">
+                            <span className="text-[#88847D] font-medium">
                               None (Root)
                             </span>
                           )}
                         </td>
-                        <td className="py-3 px-4 text-slate-600">
+                        <td className="py-3 px-4 text-[#88847D]">
                           <span className="inline-flex items-center gap-1.5">
-                            <Package className="w-3.5 h-3.5 text-slate-400" />
+                            <Package className="w-3.5 h-3.5 text-[#A58B6F]" />
                             <span>{productCount}</span>
                           </span>
                         </td>
@@ -534,28 +534,28 @@ export const Categories: React.FC = () => {
                             <div className="flex items-center justify-end gap-1">
                               <button
                                 onClick={() => openCreateModal(cat.id)}
-                                className="p-1.5 rounded text-slate-500 hover:text-indigo-700 hover:bg-slate-100"
+                                className="p-1.5 rounded text-[#88847D] hover:text-[#795438] hover:bg-[#F3EDE6]"
                                 title="Add child"
                               >
                                 <FolderPlus className="w-3.5 h-3.5" />
                               </button>
                               <button
                                 onClick={() => openMoveModal(cat)}
-                                className="p-1.5 rounded text-slate-500 hover:text-indigo-700 hover:bg-slate-100"
+                                className="p-1.5 rounded text-[#88847D] hover:text-[#795438] hover:bg-[#F3EDE6]"
                                 title="Move"
                               >
                                 <ArrowRightLeft className="w-3.5 h-3.5" />
                               </button>
                               <button
                                 onClick={() => openEditModal(cat)}
-                                className="p-1.5 rounded text-slate-500 hover:text-indigo-700 hover:bg-slate-100"
+                                className="p-1.5 rounded text-[#88847D] hover:text-[#795438] hover:bg-[#F3EDE6]"
                                 title="Edit"
                               >
                                 <Edit2 className="w-3.5 h-3.5" />
                               </button>
                               <button
                                 onClick={() => setDeletingCategory(cat)}
-                                className="p-1.5 rounded text-slate-500 hover:text-slate-900 hover:bg-slate-100"
+                                className="p-1.5 rounded text-[#88847D] hover:text-[#292824] hover:bg-[#F3EDE6]"
                                 title="Delete"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
@@ -585,18 +585,18 @@ export const Categories: React.FC = () => {
       >
         <form onSubmit={handleSubmit(onSaveSubmit)} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
+            <label className="block text-xs font-semibold text-[#292824] mb-1">
               Category Name *
             </label>
             <Input
               {...register("name")}
-              placeholder="e.g. Computers & Laptops"
+              placeholder="e.g. Lighting or Table Lamps"
               error={errors.name?.message}
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
+            <label className="block text-xs font-semibold text-[#292824] mb-1">
               Parent Category
             </label>
             <Select
@@ -617,25 +617,25 @@ export const Categories: React.FC = () => {
                   })),
               ]}
             />
-            <p className="text-[11px] text-slate-500 mt-1">
+            <p className="text-[11px] text-[#88847D] mt-1">
               Selecting a parent creates a subcategory. Cycles are automatically
               prevented.
             </p>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
+            <label className="block text-xs font-semibold text-[#292824] mb-1">
               Description (Optional)
             </label>
             <textarea
               {...register("description")}
               rows={3}
               placeholder="Provide a brief summary of items categorized here..."
-              className="w-full text-xs rounded-lg border border-slate-300 p-2 focus:ring-1 focus:ring-[#4338CA] focus:border-[#4338CA] outline-none"
+              className="w-full text-xs rounded-lg border border-[#DDD6CA] bg-white text-[#292824] p-2 focus:ring-1 focus:ring-[#795438] focus:border-[#795438] outline-none"
             />
           </div>
 
-          <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+          <div className="flex justify-end gap-2 pt-3 border-t border-[#E8E3DA]">
             <Button
               type="button"
               variant="outline"
@@ -667,9 +667,9 @@ export const Categories: React.FC = () => {
         title={`Move Category: ${movingCategory?.name}`}
       >
         <div className="space-y-4">
-          <p className="text-xs text-slate-600">
+          <p className="text-xs text-[#88847D]">
             Relocate{" "}
-            <span className="font-semibold text-slate-900">
+            <span className="font-semibold text-[#292824]">
               {movingCategory?.name}
             </span>{" "}
             and all of its subcategories under a new parent or promote it to a
@@ -677,7 +677,7 @@ export const Categories: React.FC = () => {
           </p>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
+            <label className="block text-xs font-semibold text-[#292824] mb-1">
               Target Parent
             </label>
             <Select
@@ -699,7 +699,7 @@ export const Categories: React.FC = () => {
             />
           </div>
 
-          <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+          <div className="flex justify-end gap-2 pt-3 border-t border-[#E8E3DA]">
             <Button
               type="button"
               variant="outline"

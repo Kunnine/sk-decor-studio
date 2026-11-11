@@ -18,7 +18,7 @@ const queryClient = new QueryClient({
 export const App: React.FC = () => {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
+      <AuthProvider onSessionChange={() => queryClient.clear()}>
         <ToastProvider>
           <RouterProvider router={router} />
         </ToastProvider>
