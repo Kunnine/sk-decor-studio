@@ -1,13 +1,13 @@
 # Stage 1: Build React SPA
-FROM node:20-alpine AS build
+FROM node:22-alpine AS build
 
 WORKDIR /app
 
 # Copy dependency manifests
-COPY package.json package-lock.json ./
+COPY package*.json ./
 
 # Install dependencies cleanly
-RUN npm ci
+RUN npm install
 
 # Copy frontend source code
 COPY . .

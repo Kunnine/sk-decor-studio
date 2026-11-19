@@ -1,10 +1,10 @@
 # =========================================================================
 # Stage 1: Build React 19 Frontend SPA
 # =========================================================================
-FROM node:20-alpine AS frontend-builder
+FROM node:22-alpine AS frontend-builder
 WORKDIR /app/frontend
-COPY frontend/package.json frontend/package-lock.json ./
-RUN npm ci
+COPY frontend/package*.json ./
+RUN npm install
 COPY frontend/ ./
 # Empty VITE_API_BASE_URL instructs Axios to use relative /api/v1 (same domain)
 ENV VITE_API_BASE_URL=""

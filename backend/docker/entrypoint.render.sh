@@ -89,12 +89,12 @@ fi
 # -------------------------------------------------------------
 # 4. Database Migrations and Seeders
 # -------------------------------------------------------------
-if [ "$RUN_MIGRATIONS_ON_BOOT" = "true" ] || [ "$DB_CONNECTION" = "sqlite" ] || [ -z "$DB_HOST" ]; then
+if [ "$RUN_MIGRATIONS_ON_BOOT" = "true" ] || [ "$DB_CONNECTION" = "sqlite" ] || [ -n "$MYSQL_URL" ] || [ -n "$MYSQLHOST" ] || [ -z "$DB_HOST" ]; then
     echo "==> Running database migrations..."
     php artisan migrate --force --no-interaction
 
-    # Run seeders if RUN_SEEDER=true, or if database is SQLite (first run)
-    if [ "$RUN_SEEDER" = "true" ] || [ "$DB_CONNECTION" = "sqlite" ]; then
+    # Run seeders if RUN_SEEDER=true, or if database is SQLite / Railway (initial setup)
+    if [ "$RUN_SEEDER" = "true" ] || [ "$DB_CONNECTION" = "sqlite" ] || [ -n "$MYSQL_URL" ] || [ -n "$MYSQLHOST" ]; then
         echo "==> Running database seeders (admin & initial catalog)..."
         php artisan db:seed --force --no-interaction || true
     fi
