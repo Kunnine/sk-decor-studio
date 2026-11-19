@@ -273,7 +273,7 @@ class AnalyticsService
 
             return $rows->map(function ($row) {
                 $thumbUrl = null;
-                if (! empty($row->thumb_path) && Storage::disk('public')->exists($row->thumb_path)) {
+                if (! empty($row->thumb_path) && (config('filesystems.disks.public.driver') === 's3' || Storage::disk('public')->exists($row->thumb_path))) {
                     $thumbUrl = Storage::disk('public')->url($row->thumb_path);
                 }
 
@@ -464,7 +464,7 @@ class AnalyticsService
                 ->get()
                 ->map(function ($row) {
                     $thumbUrl = null;
-                    if (! empty($row->thumb_path) && Storage::disk('public')->exists($row->thumb_path)) {
+                    if (! empty($row->thumb_path) && (config('filesystems.disks.public.driver') === 's3' || Storage::disk('public')->exists($row->thumb_path))) {
                         $thumbUrl = Storage::disk('public')->url($row->thumb_path);
                     }
 

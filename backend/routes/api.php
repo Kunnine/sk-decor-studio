@@ -17,6 +17,8 @@ use App\Http\Controllers\Api\V1\StockMovementController;
 use App\Http\Controllers\Api\V1\SupplierController;
 use App\Http\Controllers\Api\V1\UnitController;
 use App\Http\Controllers\Api\V1\UserController;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -24,6 +26,21 @@ Route::prefix('v1')->group(function () {
     Route::post('/login', [AuthController::class, 'login'])->name('login');
     Route::prefix('auth')->group(function () {
         Route::post('/login', [AuthController::class, 'login']);
+    });
+
+    // Scheduled Vercel Cron trigger for daily low-stock email digest
+    Route::get('/cron/low-stock-digest', function (Request $request) {
+        $secret = config('app.cron_secret');
+        if (! is_string($secret) || $secret === '' || ! hash_equals($secret, (string) $request->bearerToken())) {
+            abort(401, 'Unauthorized cron trigger.');
+        }
+
+        Artisan::call('stock:low-digest');
+
+        return response()->json([
+            'status' => 'ok',
+            'output' => trim(Artisan::output()),
+        ]);
     });
 
     // Public signed PDF routes

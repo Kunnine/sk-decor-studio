@@ -95,7 +95,11 @@ class Product extends Model
 
     public function getImageUrlAttribute(): ?string
     {
-        if ($this->image_path && Storage::disk('public')->exists($this->image_path)) {
+        if (! $this->image_path) {
+            return null;
+        }
+
+        if (config('filesystems.disks.public.driver') === 's3' || Storage::disk('public')->exists($this->image_path)) {
             return Storage::disk('public')->url($this->image_path);
         }
 
@@ -104,7 +108,11 @@ class Product extends Model
 
     public function getThumbUrlAttribute(): ?string
     {
-        if ($this->thumb_path && Storage::disk('public')->exists($this->thumb_path)) {
+        if (! $this->thumb_path) {
+            return null;
+        }
+
+        if (config('filesystems.disks.public.driver') === 's3' || Storage::disk('public')->exists($this->thumb_path)) {
             return Storage::disk('public')->url($this->thumb_path);
         }
 

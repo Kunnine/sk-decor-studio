@@ -3,8 +3,13 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 export const AUTH_SYNC_EVENT = "auth:sync";
 export const AUTH_FORBIDDEN_EVENT = "auth:forbidden";
 
+const rawApiBase = (import.meta.env.VITE_API_BASE_URL ?? "").trim();
+const apiBaseUrl = rawApiBase
+  ? `${rawApiBase.replace(/\/+$/, "")}/api/v1`
+  : "/api/v1";
+
 const api = axios.create({
-  baseURL: "/api/v1",
+  baseURL: apiBaseUrl,
   headers: {
     "Content-Type": "application/json",
     Accept: "application/json",

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { act } from "react";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import { BrowserRouter } from "react-router-dom";
@@ -130,5 +130,122 @@ describe("Login Component", () => {
     await waitFor(() => {
       expect(screen.getByText(/valid email address/i)).toBeInTheDocument();
     });
+  });
+
+  it("expands demo account dropdown when clicking Demo Account button", () => {
+    render(
+      <BrowserRouter>
+        <AuthProvider>
+          <Login />
+        </AuthProvider>
+      </BrowserRouter>,
+    );
+
+    const demoToggle = screen.getByRole("button", { name: /demo account/i });
+    expect(demoToggle).toBeInTheDocument();
+
+    // Roles are hidden initially
+    expect(screen.queryByText(/^Admin$/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Manager$/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Cashier$/)).not.toBeInTheDocument();
+
+    // Click to expand
+    fireEvent.click(demoToggle);
+
+    // Verify all 3 roles with descriptions and emails appear
+    expect(screen.getByText(/^Admin$/)).toBeInTheDocument();
+    expect(screen.getByText(/admin@inventory\.test/i)).toBeInTheDocument();
+    expect(screen.getByText(/full access/i)).toBeInTheDocument();
+
+    expect(screen.getByText(/^Manager$/)).toBeInTheDocument();
+    expect(screen.getByText(/manager@inventory\.test/i)).toBeInTheDocument();
+    expect(screen.getByText(/business operations/i)).toBeInTheDocument();
+
+    expect(screen.getByText(/^Cashier$/)).toBeInTheDocument();
+    expect(screen.getByText(/cashier@inventory\.test/i)).toBeInTheDocument();
+    expect(screen.getByText(/pos only/i)).toBeInTheDocument();
+  });
+
+  it("auto-fills credentials when a demo account is selected and submits via normal login", async () => {
+    render(
+      <BrowserRouter>
+        <AuthProvider>
+          <Login />
+        </AuthProvider>
+      </BrowserRouter>,
+    );
+
+    const emailInput = screen.getByLabelText(/email address/i) as HTMLInputElement;
+    const passwordInput = screen.getByLabelText(/^password/i) as HTMLInputElement;
+
+    // Expand demo dropdown
+    fireEvent.click(screen.getByRole("button", { name: /demo account/i }));
+
+    // Click Admin demo card
+    const adminButton = screen.getByRole("button", { name: /admin/i });
+    fireEvent.click(adminButton);
+
+    expect(emailInput.value).toBe("admin@inventory.test");
+    expect(passwordInput.value).toBe("Password123!");
+
+    // Submit via the normal Login button
+    const submitBtn = screen.getByRole("button", { name: /sign in/i });
+    fireEvent.click(submitBtn);
+
+    await waitFor(() => {
+      expect(authApi.login).toHaveBeenCalledWith({
+        email: "admin@inventory.test",
+        password: "Password123!",
+      });
+    });
+  });
+
+  it("switches to Cashier demo account when clicked", async () => {
+    render(
+      <BrowserRouter>
+        <AuthProvider>
+          <Login />
+        </AuthProvider>
+      </BrowserRouter>,
+    );
+
+    const emailInput = screen.getByLabelText(/email address/i) as HTMLInputElement;
+    const passwordInput = screen.getByLabelText(/^password/i) as HTMLInputElement;
+
+    // Expand demo dropdown
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /demo account/i }));
+    });
+
+    // Click Cashier demo card
+    const cashierButton = screen.getByRole("button", { name: /cashier/i });
+    await act(async () => {
+      fireEvent.click(cashierButton);
+    });
+
+    expect(emailInput.value).toBe("cashier@inventory.test");
+    expect(passwordInput.value).toBe("Password123!");
+  });
+
+  it("opens and closes the registration information modal", () => {
+    render(
+      <BrowserRouter>
+        <AuthProvider>
+          <Login />
+        </AuthProvider>
+      </BrowserRouter>,
+    );
+
+    const registerBtn = screen.getByRole("button", { name: /^register$/i });
+    fireEvent.click(registerBtn);
+
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByText(/account registration/i)).toBeInTheDocument();
+    expect(screen.getByText(/system administrator/i)).toBeInTheDocument();
+
+    const gotItBtn = screen.getByRole("button", { name: /got it/i });
+    fireEvent.click(gotItBtn);
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 });

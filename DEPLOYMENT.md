@@ -252,3 +252,20 @@ Before opening the system to live cashier transactions:
 - [ ] **Reconciliation Check Passed**: `php artisan stock:reconcile` reports 0 differences.
 - [ ] **Default Passwords Changed**: Admin, Manager, and Cashier accounts updated with unique secure passwords.
 - [ ] **Off-site Backups Tested**: Database dump and restore successfully verified on staging environment.
+
+---
+
+## 9. Vercel Deployment (Container Backend + SPA Frontend)
+
+For cloud deployments split across two Vercel projects (using Vercel's Container Runtime with FrankenPHP for the Laravel API and static Vite hosting for the React SPA):
+
+### Backend Project (Root Directory: `backend`)
+- **Runtime files**: [`backend/Dockerfile.vercel`](backend/Dockerfile.vercel), [`backend/Caddyfile.vercel`](backend/Caddyfile.vercel), [`backend/docker/entrypoint.vercel.sh`](backend/docker/entrypoint.vercel.sh), and [`backend/vercel.json`](backend/vercel.json).
+- **Database**: Connect an external cloud MySQL 8-compatible service (such as **TiDB Cloud Starter**). Configure `DB_CONNECTION=mysql`, `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD`, and `MYSQL_ATTR_SSL_CA=/etc/ssl/certs/ca-certificates.crt` (see [`backend/.env.vercel.example`](backend/.env.vercel.example)).
+- **Object Storage**: Set `FILESYSTEM_DISK=s3` with S3/Cloudflare R2 credentials (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_BUCKET`, `AWS_ENDPOINT`, `AWS_URL`) so uploaded product images and business logos persist across container restarts.
+- **Queues & Cron**: Set `QUEUE_CONNECTION=sync` and configure `CRON_SECRET` so Vercel Cron triggers `/api/v1/cron/low-stock-digest` daily at `08:00 UTC`.
+
+### Frontend Project (Root Directory: `frontend`)
+- **SPA Routing**: [`frontend/vercel.json`](frontend/vercel.json) rewrites all non-file routes to `/index.html` for React Router.
+- **API Endpoint**: Set `VITE_API_BASE_URL` to your deployed backend Vercel URL (e.g., `https://your-backend.vercel.app`) in Vercel Project Environment Variables and redeploy.
+- **CORS**: Set `FRONTEND_URL` and `CORS_ALLOWED_ORIGINS` on the backend Vercel project to match your frontend Vercel URL.

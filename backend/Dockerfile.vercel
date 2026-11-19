@@ -1,0 +1,84 @@
+# Stage 1: Install production PHP dependencies
+FROM composer:2.8 AS vendor
+WORKDIR /app
+COPY composer.json composer.lock ./
+RUN composer install \
+    --no-dev \
+    --no-interaction \
+    --no-scripts \
+    --prefer-dist \
+    --ignore-platform-reqs
+
+# Stage 2: Production runtime with FrankenPHP (PHP 8.3 + Caddy)
+FROM dunglas/frankenphp:1-php8.3-bookworm
+
+WORKDIR /app
+
+# Install required PHP extensions (including GD with WebP/JPEG/PNG/FreeType support)
+RUN install-php-extensions \
+    bcmath \
+    gd \
+    intl \
+    opcache \
+    pcntl \
+    pdo_mysql \
+    zip
+
+# Configure PHP production settings
+RUN cp "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini" && \
+    { \
+        echo 'memory_limit=256M'; \
+        echo 'upload_max_filesize=10M'; \
+        echo 'post_max_size=12M'; \
+        echo 'max_execution_time=60'; \
+        echo 'opcache.enable=1'; \
+        echo 'opcache.memory_consumption=128'; \
+        echo 'opcache.interned_strings_buffer=8'; \
+        echo 'opcache.max_accelerated_files=10000'; \
+        echo 'opcache.validate_timestamps=0'; \
+        echo 'opcache.save_comments=1'; \
+    } > "$PHP_INI_DIR/conf.d/zz-production.ini"
+
+# Copy Composer from stage 1 to build optimized autoloader
+COPY --from=vendor /usr/bin/composer /usr/bin/composer
+COPY --from=vendor /app/vendor /app/vendor
+
+# Copy application source
+COPY . /app
+
+# Generate optimized autoloader and package manifest (defer config/route/view caching to runtime)
+RUN composer dump-autoload --optimize --no-dev --no-scripts && \
+    php artisan package:discover --ansi
+
+# Configure Caddyfile and startup entrypoint
+COPY Caddyfile.vercel /etc/caddy/Caddyfile
+COPY docker/entrypoint.vercel.sh /usr/local/bin/entrypoint.vercel.sh
+RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.vercel.sh && \
+    chmod +x /usr/local/bin/entrypoint.vercel.sh
+
+# Ensure Laravel writable directories exist
+RUN mkdir -p \
+        /app/storage/app/public \
+        /app/storage/app/private \
+        /app/storage/fonts \
+        /app/storage/framework/cache/data \
+        /app/storage/framework/sessions \
+        /app/storage/framework/views \
+        /app/storage/logs \
+        /app/bootstrap/cache && \
+    chmod -R 775 /app/storage /app/bootstrap/cache
+
+# Direct runtime writes to writable /tmp (Vercel containers mount rootfs read-only)
+ENV PORT=8080 \
+    XDG_DATA_HOME=/tmp/caddy-data \
+    XDG_CONFIG_HOME=/tmp/caddy-config \
+    APP_SERVICES_CACHE=/tmp/bootstrap/cache/services.php \
+    APP_CONFIG_CACHE=/tmp/bootstrap/cache/config.php \
+    APP_ROUTES_CACHE=/tmp/bootstrap/cache/routes-v7.php \
+    APP_EVENTS_CACHE=/tmp/bootstrap/cache/events.php \
+    VIEW_COMPILED_PATH=/tmp/storage/framework/views \
+    FILESYSTEM_LOCAL_ROOT=/tmp/storage/app
+
+EXPOSE 8080
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.vercel.sh"]
