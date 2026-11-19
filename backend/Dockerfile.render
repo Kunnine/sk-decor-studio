@@ -1,0 +1,77 @@
+# Stage 1: Install production PHP dependencies
+FROM composer:2.8 AS vendor
+WORKDIR /app
+COPY composer.json composer.lock ./
+RUN composer install \
+    --no-dev \
+    --no-interaction \
+    --no-scripts \
+    --prefer-dist \
+    --ignore-platform-reqs
+
+# Stage 2: Production runtime with FrankenPHP (PHP 8.3 + Caddy)
+FROM dunglas/frankenphp:1-php8.3-bookworm
+
+WORKDIR /app
+
+# Install required PHP extensions (GD with WebP/JPEG/PNG/FreeType, MySQL, PostgreSQL, SQLite)
+RUN install-php-extensions \
+    bcmath \
+    gd \
+    intl \
+    opcache \
+    pcntl \
+    pdo_mysql \
+    pdo_pgsql \
+    pdo_sqlite \
+    zip
+
+# Configure PHP production settings
+RUN cp "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini" && \
+    { \
+        echo 'memory_limit=256M'; \
+        echo 'upload_max_filesize=20M'; \
+        echo 'post_max_size=25M'; \
+        echo 'max_execution_time=60'; \
+        echo 'opcache.enable=1'; \
+        echo 'opcache.memory_consumption=128'; \
+        echo 'opcache.interned_strings_buffer=8'; \
+        echo 'opcache.max_accelerated_files=10000'; \
+        echo 'opcache.validate_timestamps=0'; \
+        echo 'opcache.save_comments=1'; \
+    } > "$PHP_INI_DIR/conf.d/zz-production.ini"
+
+# Copy Composer and pre-installed vendor from stage 1
+COPY --from=vendor /usr/bin/composer /usr/bin/composer
+COPY --from=vendor /app/vendor /app/vendor
+
+# Copy application source code
+COPY . /app
+
+# Generate optimized autoloader and package manifest
+RUN composer dump-autoload --optimize --no-dev --no-scripts && \
+    php artisan package:discover --ansi
+
+# Configure Caddyfile and startup entrypoint
+COPY Caddyfile.render /etc/caddy/Caddyfile
+COPY docker/entrypoint.render.sh /usr/local/bin/entrypoint.render.sh
+RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.render.sh && \
+    chmod +x /usr/local/bin/entrypoint.render.sh
+
+# Ensure Laravel storage and cache directories exist with appropriate permissions
+RUN mkdir -p \
+        /app/storage/app/public \
+        /app/storage/app/private \
+        /app/storage/framework/cache/data \
+        /app/storage/framework/sessions \
+        /app/storage/framework/views \
+        /app/storage/logs \
+        /app/bootstrap/cache && \
+    chown -R www-data:www-data /app/storage /app/bootstrap/cache && \
+    chmod -R 775 /app/storage /app/bootstrap/cache
+
+ENV PORT=10000
+
+EXPOSE 10000
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.render.sh"]

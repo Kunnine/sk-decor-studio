@@ -1,0 +1,76 @@
+# =============================================================================
+# Render Blueprint Specification
+# Deploy SK Decor Studio - Inventory & Sales Management System to Render
+# Docs: https://render.com/docs/blueprint-spec
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # 1. Backend API Service (Laravel 11 + PHP 8.3 + FrankenPHP)
+  # ---------------------------------------------------------------------------
+  - type: web
+    name: inventory-backend
+    runtime: docker
+    dockerContext: ./backend
+    dockerfilePath: ./backend/Dockerfile.render
+    plan: free
+    region: oregon
+    healthCheckPath: /up
+    envVars:
+      - key: APP_NAME
+        value: "SK Decor Studio"
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: APP_KEY
+        generateValue: true
+      - key: APP_URL
+        fromService:
+          type: web
+          name: inventory-backend
+          property: host
+      - key: FRONTEND_URL
+        fromService:
+          type: web
+          name: inventory-frontend
+          property: host
+      - key: RUN_MIGRATIONS_ON_BOOT
+        value: "true"
+      - key: RUN_SEEDER
+        value: "true"
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DATABASE_URL
+        fromDatabase:
+          name: inventory-db
+          property: connectionString
+
+  # ---------------------------------------------------------------------------
+  # 2. Frontend SPA Service (React 19 + Vite + Tailwind CSS - 100% Free CDN)
+  # ---------------------------------------------------------------------------
+  - type: web
+    name: inventory-frontend
+    runtime: static
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: ./frontend/dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_BASE_URL
+        fromService:
+          type: web
+          name: inventory-backend
+          property: host
+
+databases:
+  # ---------------------------------------------------------------------------
+  # 3. Managed Database Service (Render PostgreSQL Free Tier)
+  # ---------------------------------------------------------------------------
+  - name: inventory-db
+    databaseName: inventory_db
+    user: inventory_user
+    plan: free
+    region: oregon

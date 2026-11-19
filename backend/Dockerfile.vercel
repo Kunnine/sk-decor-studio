@@ -22,6 +22,7 @@ RUN install-php-extensions \
     opcache \
     pcntl \
     pdo_mysql \
+    pdo_sqlite \
     zip
 
 # Configure PHP production settings

@@ -4,9 +4,12 @@ export const AUTH_SYNC_EVENT = "auth:sync";
 export const AUTH_FORBIDDEN_EVENT = "auth:forbidden";
 
 const rawApiBase = (import.meta.env.VITE_API_BASE_URL ?? "").trim();
-const apiBaseUrl = rawApiBase
-  ? `${rawApiBase.replace(/\/+$/, "")}/api/v1`
-  : "/api/v1";
+const normalizedApiBase = rawApiBase
+  ? (rawApiBase.startsWith("http://") || rawApiBase.startsWith("https://")
+      ? rawApiBase
+      : `https://${rawApiBase}`).replace(/\/+$/, "")
+  : "";
+const apiBaseUrl = normalizedApiBase ? `${normalizedApiBase}/api/v1` : "/api/v1";
 
 const api = axios.create({
   baseURL: apiBaseUrl,
