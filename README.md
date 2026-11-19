@@ -66,6 +66,8 @@ sk-decor-studio/
 │   └── package.json
 │
 ├── docker-compose.yml
+├── railway.json
+├── RAILWAY_DEPLOYMENT.md
 ├── render.yaml
 ├── RENDER_DEPLOYMENT.md
 ├── DEPLOYMENT.md

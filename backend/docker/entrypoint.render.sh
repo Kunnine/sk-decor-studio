@@ -20,10 +20,30 @@ mkdir -p \
 # Ensure writable permissions
 chmod -R 775 /app/storage /app/bootstrap/cache 2>/dev/null || true
 
+# Auto-configure APP_URL if running on Railway
+if [ -z "$APP_URL" ] && [ -n "$RAILWAY_PUBLIC_DOMAIN" ]; then
+    export APP_URL="https://$RAILWAY_PUBLIC_DOMAIN"
+    echo "==> Automatically set APP_URL to https://$RAILWAY_PUBLIC_DOMAIN"
+fi
+
 # -------------------------------------------------------------
 # 1. Database Connection Discovery
 # -------------------------------------------------------------
-if [ -n "$DATABASE_URL" ]; then
+# Railway MySQL auto-discovery
+if [ -n "$MYSQL_URL" ] || [ -n "$MYSQLHOST" ]; then
+    echo "==> Detected Railway MySQL service..."
+    export DB_CONNECTION=mysql
+    if [ -n "$MYSQL_URL" ]; then
+        export DB_URL="$MYSQL_URL"
+    fi
+    if [ -n "$MYSQLHOST" ]; then
+        export DB_HOST="$MYSQLHOST"
+        export DB_PORT="${MYSQLPORT:-3306}"
+        export DB_USERNAME="${MYSQLUSER:-root}"
+        export DB_PASSWORD="$MYSQLPASSWORD"
+        export DB_DATABASE="${MYSQLDATABASE:-railway}"
+    fi
+elif [ -n "$DATABASE_URL" ]; then
     echo "==> Using DATABASE_URL connection string..."
     case "$DATABASE_URL" in
         postgres*|pgsql*)

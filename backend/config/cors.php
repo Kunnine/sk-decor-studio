@@ -25,6 +25,8 @@ return [
 
     'allowed_origins_patterns' => [
         '#^https?://.*\.onrender\.com$#',
+        '#^https?://.*\.up\.railway\.app$#',
+        '#^https?://.*\.railway\.app$#',
     ],
 
     'allowed_headers' => ['*'],
