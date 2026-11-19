@@ -83,7 +83,8 @@ fi
 # -------------------------------------------------------------
 if [ -z "$APP_KEY" ]; then
     echo "==> Generating application encryption key..."
-    php artisan key:generate --force --no-interaction
+    touch /app/.env
+    php artisan key:generate --force --no-interaction || true
 fi
 
 # -------------------------------------------------------------
